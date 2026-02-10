@@ -13,7 +13,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener
 import com.badlogic.gdx.utils.viewport.ScreenViewport
-import javax.swing.event.ChangeEvent
 
 
 class Main : ApplicationAdapter() {
@@ -46,10 +45,10 @@ class Main : ApplicationAdapter() {
     fun buildLayout() {
         root!!.clear()
         when (currentScreen!!) {
-            GameScreen.MENU -> root!!.add(buildMenuScreen())
-            GameScreen.RULES -> root!!.add(buildRulesScreen()).expand().fill()
-            GameScreen.HELP -> root!!.add(buildHelpScreen()).expand().fill()
-            GameScreen.GAME -> root!!.add(buildGameScreen())
+            GameScreen.MENU -> root!!.add(buildMenuScreen()).grow()
+            GameScreen.RULES -> root!!.add(buildRulesScreen()).grow()
+            GameScreen.HELP -> root!!.add(buildHelpScreen()).grow()
+            GameScreen.GAME -> root!!.add(buildGameScreen()).grow()
         }
     }
 
@@ -84,9 +83,9 @@ class Main : ApplicationAdapter() {
         label = Label("How Many Players?", skin)
         table.add(label).center()
         table.row().padTop(5f)
-        var playerSelectTable = Table()
+        val playerSelectTable = Table()
         playerSelectTable.defaults().pad(10f)
-        var playerButtons = object: ButtonGroup<CheckBox>(){
+        val playerButtons = object: ButtonGroup<CheckBox>(){
             override fun canCheck(button: CheckBox?, newState: Boolean): Boolean {
                 val returnVal = super.canCheck(button, newState)
                 when(checkedIndex){
@@ -209,8 +208,8 @@ class Main : ApplicationAdapter() {
         val table = Table()
 
         //Display the players
-        val playersTable = game!!.buildPlayersTable()
-        table.add(playersTable)
+        val playersTable = game!!.buildPlayersTable(skin!!)
+        table.add(playersTable).growX()
         table.row()
 
         val turnOptionsTable = Table()

@@ -1,6 +1,8 @@
 package com.andrewleetham.quoridor
 
+import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.ui.Table
+import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import java.lang.NumberFormatException
 import kotlin.math.abs
 import kotlin.random.Random
@@ -388,13 +390,28 @@ class QuoridorCore {
                 "by a fence, or occupied by a third piece), you may instead jump to either side of that piece, if possible")
     }
 
-    fun buildPlayersTable(): Table{
+    fun buildPlayersTable(skin: Skin): Table{
         val table = Table()
+
+        table.add(players[0].buildPlayerDisplay(skin)).growX()
+        table.add(players[1].buildPlayerDisplay(skin)).growX()
+        if(players.count() > 2){
+            table.row()
+            table.add(players[2].buildPlayerDisplay(skin)).growX()
+            if (players.count() == 4){
+                table.add(players[3].buildPlayerDisplay(skin)).growX()
+            }
+        }
+
+        table.row()
+        val label = Label("${players[currentPlayerIndex].playerName}'s Turn", skin)
+        table.add(label).colspan(2).center()
+
 
         return table
     }
 
-    fun getCurrentPlayer(): QuoridorPlayer {return players[currentPlayerIndex]}
+    //fun getCurrentPlayer(): QuoridorPlayer {return players[currentPlayerIndex]}
 
     fun buildBoardTable(): Table {
         val table = Table()
