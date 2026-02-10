@@ -1,11 +1,15 @@
 package com.andrewleetham.quoridor
 
+import com.badlogic.gdx.scenes.scene2d.ui.Table
 import java.lang.NumberFormatException
+import kotlin.math.abs
 import kotlin.random.Random
 
 class QuoridorCore {
     private var players: Array<QuoridorPlayer> = emptyArray()
     private var board: QuoridorBoard = QuoridorBoard(1)
+    private var currentPlayerIndex = -1
+    private var gameEnd = false
 
     fun PrepareGame(playerCount: Int, boardSize: Int = 9): Boolean {
         if (playerCount < 2 || playerCount > 4 || boardSize < 3){
@@ -46,6 +50,14 @@ class QuoridorCore {
         return true
     }
 
+    fun startGame() {
+        if (players.isEmpty()){
+            throw Error("Tried to start a game with no players")
+        }
+        currentPlayerIndex = abs(Random.nextInt()) % players.count()
+        gameEnd = false
+    }
+
 
 
     fun RunGame() {
@@ -53,8 +65,8 @@ class QuoridorCore {
             println("The game cannot run if it isn't set up!")
             return
         }
-        var currentPlayerIndex = Math.abs(Random.nextInt()) % players.count()
-        var gameEnd = false
+        currentPlayerIndex = Math.abs(Random.nextInt()) % players.count()
+        gameEnd = false
         var line: String
 
         while (!gameEnd){
@@ -374,5 +386,19 @@ class QuoridorCore {
         println("When two pieces are next to each other, and not separated by a wall, you can instead jump over the other\n" +
                 "piece to the space on the far side. If you cannot move to that space (because it is off the board, blocked\n" +
                 "by a fence, or occupied by a third piece), you may instead jump to either side of that piece, if possible")
+    }
+
+    fun buildPlayersTable(): Table{
+        val table = Table()
+
+        return table
+    }
+
+    fun getCurrentPlayer(): QuoridorPlayer {return players[currentPlayerIndex]}
+
+    fun buildBoardTable(): Table {
+        val table = Table()
+
+        return table
     }
 }

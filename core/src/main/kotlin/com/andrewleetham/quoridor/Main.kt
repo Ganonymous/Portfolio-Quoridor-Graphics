@@ -47,8 +47,8 @@ class Main : ApplicationAdapter() {
         root!!.clear()
         when (currentScreen!!) {
             GameScreen.MENU -> root!!.add(buildMenuScreen())
-            GameScreen.RULES -> root!!.add(buildRulesScreen())
-            GameScreen.HELP -> root!!.add(buildHelpScreen())
+            GameScreen.RULES -> root!!.add(buildRulesScreen()).expand().fill()
+            GameScreen.HELP -> root!!.add(buildHelpScreen()).expand().fill()
             GameScreen.GAME -> root!!.add(buildGameScreen())
         }
     }
@@ -128,6 +128,7 @@ class Main : ApplicationAdapter() {
         textButton.isDisabled = !readyToPlay
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
+                game!!.startGame()
                 currentScreen = GameScreen.GAME
                 buildLayout()
             }
@@ -149,7 +150,13 @@ class Main : ApplicationAdapter() {
         table.add(label).center()
         table.row()
 
-        label = Label("This is a placeholder. I'll type in the rules later", skin)
+        label = Label("To Win, be the first to get to the far side of the board from where you start.\n" +
+            "This program handles setup for you, and randomly decides who goes first.\n" +
+            "On your turn, either move your piece or place a wall. If you have no walls left, you must move your piece.\n" +
+            "Pieces move one space at a time, horizontally or vertically. You cannot move through a wall.\n" +
+            "Walls are two spaces wide, and are placed between the spaces. Walls cannot extend off the board.\n" +
+            "Walls can be placed to block opponents, but a path to each player's goal must remain open.\n" +
+            "When two pieces are next to each other, and not separated by a wall, you can instead jump over the other piece to the space on the far side. If you cannot move to that space (because it is off the board, blocked by a wall, or occupied by a third piece), you may instead jump to either side of that piece, if possible.", skin)
         label.setWrap(true)
         table.add(label).center().growX()
         table.row()
@@ -168,14 +175,60 @@ class Main : ApplicationAdapter() {
 
     fun buildHelpScreen(): Table {
         val table = Table()
+        table.defaults().pad(15f)
+        table.pad(30f)
 
+        //title
+        var label = Label("Quoridor Help", skin)
+        label.setFontScale(1.5f)
+        table.add(label).center()
+        table.row()
 
+        label = Label("The boxes at the top of the screen show the players in order, as well as how many walls each has left.\n" +
+            "Below that is a line saying whose turn it is.\n" +
+            "On the left are <PENDING, WHAT'S THE CONTROL> to allow you to choose to move your piece or place a wall.\n" +
+            "To the right is the board. <PENDING, DESCRIBE THE APPEARANCE>\n" +
+            "<PENDING, EXPLAIN HOW TO INPUT A MOVE>\n", skin )
+        label.setWrap(true)
+        table.add(label).center().growX()
+        table.row()
+
+        val textButton = TextButton("Back to Game", skin)
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentScreen = GameScreen.GAME
+                buildLayout()
+            }
+        })
+        table.add(textButton).center()
 
         return  table
     }
 
     fun buildGameScreen(): Table {
         val table = Table()
+
+        //Display the players
+        val playersTable = game!!.buildPlayersTable()
+        table.add(playersTable)
+        table.row()
+
+        val turnOptionsTable = Table()
+        //Pending: Actually add and implement the turn choices (wall/move)
+        table.add(turnOptionsTable)
+
+        val boardTable = game!!.buildBoardTable()
+        table.add(boardTable)
+        table.row()
+
+        val textButton = TextButton("Help", skin)
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentScreen = GameScreen.HELP
+                buildLayout()
+            }
+        })
+        table.add(textButton).center()
 
         return  table
     }
