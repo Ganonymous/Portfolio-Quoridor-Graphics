@@ -52,4 +52,9 @@ class QuoridorBoard(val boardSize: Int){
         printString += "─┘"
         println(printString)
     }
+
+    fun getPieceAt(row: Int, col: Int): Int? {
+        if(spaces[row][col] != ' ') return spaces[row][col].toString().toInt()
+        else return null
+    }
 }

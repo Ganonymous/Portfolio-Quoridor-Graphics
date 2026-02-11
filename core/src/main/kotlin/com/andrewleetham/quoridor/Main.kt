@@ -17,12 +17,14 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport
 
 class Main : ApplicationAdapter() {
     enum class GameScreen {MENU, RULES, HELP, GAME}
-    private var skin: Skin? = null
-    private var stage: Stage? = null
-    private var game : QuoridorCore? = null
-    private var currentScreen: GameScreen? = null
+    enum class TurnAction {MOVE, WALL_VERTICAL, WALL_HORIZONTAL}
+    private lateinit var skin: Skin
+    private lateinit var stage: Stage
+    private lateinit var game : QuoridorCore
+    private lateinit var currentScreen: GameScreen
     private var readyToPlay = false
-    private var root: Table? = null
+    private lateinit var root: Table
+    private lateinit var currentAction: TurnAction
 
     override fun create() {
         skin = Skin(Gdx.files.internal("metalui/metal-ui.json"))
@@ -32,40 +34,40 @@ class Main : ApplicationAdapter() {
 
 
 
-        game = QuoridorCore()
+        game = QuoridorCore(this)
         currentScreen = GameScreen.MENU
         root = Table()
-        root!!.setFillParent(true)
-        stage!!.addActor(root)
+        root.setFillParent(true)
+        stage.addActor(root)
         buildLayout()
 
 
     }
 
     fun buildLayout() {
-        root!!.clear()
-        when (currentScreen!!) {
-            GameScreen.MENU -> root!!.add(buildMenuScreen()).grow()
-            GameScreen.RULES -> root!!.add(buildRulesScreen()).grow()
-            GameScreen.HELP -> root!!.add(buildHelpScreen()).grow()
-            GameScreen.GAME -> root!!.add(buildGameScreen()).grow()
+        root.clear()
+        when (currentScreen) {
+            GameScreen.MENU -> root.add(buildMenuScreen()).grow()
+            GameScreen.RULES -> root.add(buildRulesScreen()).grow()
+            GameScreen.HELP -> root.add(buildHelpScreen()).grow()
+            GameScreen.GAME -> root.add(buildGameScreen()).grow()
         }
     }
 
     override fun render() {
         Gdx.gl.glClearColor(.9f, .9f, .9f, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
-        stage!!.act()
-        stage!!.draw()
+        stage.act()
+        stage.draw()
     }
 
     override fun resize(width: Int, height: Int) {
-        stage!!.viewport.update(width, height, true)
+        stage.viewport.update(width, height, true)
     }
 
     override fun dispose() {
-        skin!!.dispose()
-        stage!!.dispose()
+        skin.dispose()
+        stage.dispose()
     }
 
     fun buildMenuScreen(): Table {
@@ -89,9 +91,9 @@ class Main : ApplicationAdapter() {
             override fun canCheck(button: CheckBox?, newState: Boolean): Boolean {
                 val returnVal = super.canCheck(button, newState)
                 when(checkedIndex){
-                    0 ->  readyToPlay = game!!.PrepareGame(2, 9)
-                    1 -> readyToPlay = game!!.PrepareGame(3, 9)
-                    2 -> readyToPlay = game!!.PrepareGame(4, 9)
+                    0 ->  readyToPlay = game.PrepareGame(2, 9)
+                    1 -> readyToPlay = game.PrepareGame(3, 9)
+                    2 -> readyToPlay = game.PrepareGame(4, 9)
                     -1 -> readyToPlay = false
                 }
                 return returnVal
@@ -127,7 +129,8 @@ class Main : ApplicationAdapter() {
         textButton.isDisabled = !readyToPlay
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
-                game!!.startGame()
+                game.startGame()
+                currentAction = TurnAction.MOVE
                 currentScreen = GameScreen.GAME
                 buildLayout()
             }
@@ -208,15 +211,15 @@ class Main : ApplicationAdapter() {
         val table = Table()
 
         //Display the players
-        val playersTable = game!!.buildPlayersTable(skin!!)
-        table.add(playersTable).growX()
+        val playersTable = game.buildPlayersTable(skin)
+        table.add(playersTable).growX().colspan(2)
         table.row()
 
         val turnOptionsTable = Table()
         //Pending: Actually add and implement the turn choices (wall/move)
         table.add(turnOptionsTable)
 
-        val boardTable = game!!.buildBoardTable()
+        val boardTable = game.buildBoardTable(skin, currentAction)
         table.add(boardTable)
         table.row()
 
@@ -227,14 +230,14 @@ class Main : ApplicationAdapter() {
                 buildLayout()
             }
         })
-        table.add(textButton).center()
+        table.add(textButton).center().colspan(2)
 
         return  table
     }
 }
-fun main() {
+/*fun main() {
 
-    val game = QuoridorCore()
+    val game = QuoridorCore(this)
     var command : Int
     do {
         println("Welcome to the Quoridor terminal version.")
@@ -281,3 +284,4 @@ fun main() {
 
     } while (command != 4)
 }
+*/

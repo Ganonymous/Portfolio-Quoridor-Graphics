@@ -1,17 +1,24 @@
 package com.andrewleetham.quoridor
 
+import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.scenes.scene2d.InputEvent
+import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
+import com.badlogic.gdx.scenes.scene2d.ui.Stack
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
 import java.lang.NumberFormatException
 import kotlin.math.abs
 import kotlin.random.Random
 
-class QuoridorCore {
+class QuoridorCore (val host: Main) {
     private var players: Array<QuoridorPlayer> = emptyArray()
     private var board: QuoridorBoard = QuoridorBoard(1)
     private var currentPlayerIndex = -1
     private var gameEnd = false
+    lateinit var boardCells: Array<Array<Stack>>
+    lateinit var wallGhost: Image
 
     fun PrepareGame(playerCount: Int, boardSize: Int = 9): Boolean {
         if (playerCount < 2 || playerCount > 4 || boardSize < 3){
@@ -21,30 +28,30 @@ class QuoridorCore {
         board = QuoridorBoard(boardSize)
         when (playerCount) {
             2 -> {
-                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, boardSize + 1, "Player 1", '1')
-                board.spaces[player1.position.first][player1.position.second] = '1'
-                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, boardSize + 1, "Player 2", '2')
-                board.spaces[player2.position.first][player2.position.second] = '2'
+                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, boardSize + 1, "Player 1", Color.BLUE,'1')
+                board.spaces[player1.position.first][player1.position.second] = '0'
+                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, boardSize + 1, "Player 2", Color.RED, '2')
+                board.spaces[player2.position.first][player2.position.second] = '1'
                 players = arrayOf(player1, player2)
             }
             3 -> {
-                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", '1')
-                board.spaces[player1.position.first][player1.position.second] = '1'
-                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", '2')
-                board.spaces[player2.position.first][player2.position.second] = '2'
-                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", '3')
-                board.spaces[player3.position.first][player3.position.second] = '3'
+                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", Color.BLUE, '1')
+                board.spaces[player1.position.first][player1.position.second] = '0'
+                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", Color.RED, '2')
+                board.spaces[player2.position.first][player2.position.second] = '1'
+                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", Color.GREEN, '3')
+                board.spaces[player3.position.first][player3.position.second] = '2'
                 players = arrayOf(player1, player2, player3)
             }
             4 -> {
-                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", '1')
-                board.spaces[player1.position.first][player1.position.second] = '1'
-                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", '2')
-                board.spaces[player2.position.first][player2.position.second] = '2'
-                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", '3')
-                board.spaces[player3.position.first][player3.position.second] = '3'
-                val player4 = QuoridorPlayer(Pair(boardSize - 1, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 4", '4')
-                board.spaces[player4.position.first][player4.position.second] = '4'
+                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", Color.BLUE, '1')
+                board.spaces[player1.position.first][player1.position.second] = '0'
+                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", Color.RED, '2')
+                board.spaces[player2.position.first][player2.position.second] = '1'
+                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", Color.GREEN, '3')
+                board.spaces[player3.position.first][player3.position.second] = '2'
+                val player4 = QuoridorPlayer(Pair(boardSize - 1, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 4", Color.YELLOW, '4')
+                board.spaces[player4.position.first][player4.position.second] = '3'
                 players = arrayOf(player1, player2, player3, player4)
             }
         }
@@ -249,20 +256,23 @@ class QuoridorCore {
                 } else { // space occupied. Check for jumps
                     if(startRow > 1 && //there is a row to straight-jump to and
                         (startCol == 0 || board.wallIntersects[startRow - 2][startCol - 1] != QuoridorBoard.IntersectType.HORIZONTAL)
-                        && (startCol == board.boardSize - 1 || board.wallIntersects[startRow - 2][startCol] != QuoridorBoard.IntersectType.HORIZONTAL)){
-                        // No walls blocking the straight jump
+                        && (startCol == board.boardSize - 1 || board.wallIntersects[startRow - 2][startCol] != QuoridorBoard.IntersectType.HORIZONTAL)
+                        //No walls blocking the straight jump and
+                        && board.spaces[startRow - 2][startCol] == ' '){//destination space is unoccupied
                         moves.add(Pair(startRow - 2, startCol))
                     } else { // Bend jumps are only legal if the straight jump is blocked
                         if(startCol > 0 && //there is a column to bend-jump left to and
                             (startRow == 1 || board.wallIntersects[startRow - 2][startCol - 1] != QuoridorBoard.IntersectType.VERTICAL)
-                            && (board.wallIntersects[startRow - 1][startCol - 1] != QuoridorBoard.IntersectType.VERTICAL)){
-                            // No walls blocking the bend jump
+                            && (board.wallIntersects[startRow - 1][startCol - 1] != QuoridorBoard.IntersectType.VERTICAL)
+                            // no walls blocking the bend jump and
+                            && board.spaces[startRow - 1][startCol - 1] == ' '){ // destination is unoccupied
                             moves.add(Pair(startRow - 1, startCol - 1))
                         }
                         if(startCol < board.boardSize - 1 && //there is a column to bend-jump right to and
                             (startRow == 1 || board.wallIntersects[startRow - 2][startCol] != QuoridorBoard.IntersectType.VERTICAL)
-                            && (board.wallIntersects[startRow - 1][startCol] != QuoridorBoard.IntersectType.VERTICAL)){
-                            // No walls blocking the bend jump
+                            && (board.wallIntersects[startRow - 1][startCol] != QuoridorBoard.IntersectType.VERTICAL)
+                            // no walls blocking the bend jump and
+                            && board.spaces[startRow - 1][startCol + 1] == ' '){ // destination is unoccupied
                             moves.add(Pair(startRow - 1, startCol + 1))
                         }
                     }
@@ -282,22 +292,22 @@ class QuoridorCore {
                     if (startRow < board.boardSize - 2 && //there is a row to straight-jump to and
                         (startCol == 0 || board.wallIntersects[startRow + 1][startCol - 1] != QuoridorBoard.IntersectType.HORIZONTAL)
                         && (startCol == board.boardSize - 1 || board.wallIntersects[startRow + 1][startCol] != QuoridorBoard.IntersectType.HORIZONTAL)
-                    ) {
-                        // No walls blocking the straight jump
+                        //No walls blocking the straight jump and
+                        && board.spaces[startRow + 2][startCol] == ' '){//destination space is unoccupied
                         moves.add(Pair(startRow + 2, startCol))
                     } else { // Bend jumps are only legal if the straight jump is blocked
                         if (startCol > 0 && //there is a column to bend-jump left to and
                             (board.wallIntersects[startRow][startCol - 1] != QuoridorBoard.IntersectType.VERTICAL)
                             && (startRow == board.boardSize - 2 || board.wallIntersects[startRow + 1][startCol - 1] != QuoridorBoard.IntersectType.VERTICAL)
-                        ) {
-                            // No walls blocking the bend jump
+                            // no walls blocking the bend jump and
+                            && board.spaces[startRow + 1][startCol - 1] == ' '){ // destination is unoccupied
                             moves.add(Pair(startRow + 1, startCol - 1))
                         }
                         if (startCol < board.boardSize - 1 && //there is a column to bend-jump right to and
                             (board.wallIntersects[startRow][startCol] != QuoridorBoard.IntersectType.VERTICAL)
                             && (startRow == board.boardSize - 2 || board.wallIntersects[startRow + 1][startCol] != QuoridorBoard.IntersectType.VERTICAL)
-                        ) {
-                            // No walls blocking the bend jump
+                            // no walls blocking the bend jump and
+                            && board.spaces[startRow + 1][startCol + 1] == ' '){ // destination is unoccupied
                             moves.add(Pair(startRow + 1, startCol + 1))
                         }
                     }
@@ -316,22 +326,22 @@ class QuoridorCore {
                     if (startCol > 1 && //there is a column to straight-jump to and
                         (startRow == 0 || board.wallIntersects[startRow - 1][startCol - 2] != QuoridorBoard.IntersectType.VERTICAL)
                         && (startRow == board.boardSize - 1 || board.wallIntersects[startRow][startCol - 2] != QuoridorBoard.IntersectType.VERTICAL)
-                    ) {
-                        // No walls blocking the straight jump
+                        //No walls blocking the straight jump and
+                        && board.spaces[startRow][startCol - 2] == ' '){//destination space is unoccupied
                         moves.add(Pair(startRow, startCol - 2))
                     } else { // Bend jumps are only legal if the straight jump is blocked
                         if (startRow > 0 && //there is a row to bend-jump up to and
                             (startCol == 1 || board.wallIntersects[startRow - 1][startCol - 2] != QuoridorBoard.IntersectType.HORIZONTAL)
                             && (board.wallIntersects[startRow - 1][startCol - 1] != QuoridorBoard.IntersectType.HORIZONTAL)
-                        ) {
-                            // No walls blocking the bend jump
+                            // no walls blocking the bend jump and
+                            && board.spaces[startRow - 1][startCol - 1] == ' '){ // destination is unoccupied
                             moves.add(Pair(startRow - 1, startCol - 1))
                         }
                         if (startRow < board.boardSize - 1 && //there is a row to bend-jump down to and
                             (startCol == 1 || board.wallIntersects[startRow][startCol - 2] != QuoridorBoard.IntersectType.HORIZONTAL)
                             && (board.wallIntersects[startRow][startCol - 1] != QuoridorBoard.IntersectType.HORIZONTAL)
-                        ) {
-                            // No walls blocking the bend jump
+                            // no walls blocking the bend jump and
+                            && board.spaces[startRow + 1][startCol - 1] == ' '){ // destination is unoccupied
                             moves.add(Pair(startRow + 1, startCol - 1))
                         }
                     }
@@ -351,22 +361,22 @@ class QuoridorCore {
                     if (startCol < board.boardSize - 2 && //there is a column to straight-jump to and
                         (startRow == 0 || board.wallIntersects[startRow - 1][startCol + 1] != QuoridorBoard.IntersectType.VERTICAL)
                         && (startRow == board.boardSize - 1 || board.wallIntersects[startRow][startCol + 1] != QuoridorBoard.IntersectType.VERTICAL)
-                    ) {
-                        // No walls blocking the straight jump
+                        //No walls blocking the straight jump and
+                        && board.spaces[startRow][startCol + 2] == ' '){//destination space is unoccupied
                         moves.add(Pair(startRow, startCol + 2))
                     } else { // Bend jumps are only legal if the straight jump is blocked
                         if (startRow > 0 && //there is a row to bend-jump up to and
                             (board.wallIntersects[startRow - 1][startCol] != QuoridorBoard.IntersectType.HORIZONTAL)
                             && (startCol == board.boardSize - 2 || board.wallIntersects[startRow - 1][startCol + 1] != QuoridorBoard.IntersectType.HORIZONTAL)
-                        ) {
-                            // No walls blocking the bend jump
+                            // no walls blocking the bend jump and
+                            && board.spaces[startRow - 1][startCol + 1] == ' '){ // destination is unoccupied
                             moves.add(Pair(startRow - 1, startCol + 1))
                         }
                         if (startRow < board.boardSize - 1 && //there is a row to bend-jump down to and
                             (board.wallIntersects[startRow][startCol] != QuoridorBoard.IntersectType.HORIZONTAL)
                             && (startCol == board.boardSize - 2 || board.wallIntersects[startRow][startCol + 1] != QuoridorBoard.IntersectType.HORIZONTAL)
-                        ) {
-                            // No walls blocking the bend jump
+                            // no walls blocking the bend jump and
+                            && board.spaces[startRow + 1][startCol + 1] == ' '){ // destination is unoccupied
                             moves.add(Pair(startRow + 1, startCol + 1))
                         }
                     }
@@ -413,9 +423,73 @@ class QuoridorCore {
 
     //fun getCurrentPlayer(): QuoridorPlayer {return players[currentPlayerIndex]}
 
-    fun buildBoardTable(): Table {
+    fun buildBoardTable(skin: Skin, intendedAction: Main.TurnAction): Table {
         val table = Table()
+        table.defaults().pad(6f) // groove spacing
+        table.background = skin.getDrawable("rect")
+
+
+        boardCells = Array(9) { Array(9) { Stack() } }
+
+        for (row in 0 .. 8) { // board tracks top-down
+            for (col in 0..8) {
+                val cellStack = Stack()
+
+                val base = Image(skin.getDrawable("button-pressed"))
+                base.setColor(Color.LIGHT_GRAY)
+
+                cellStack.add(base)
+
+                // if a piece is here, draw it
+                val pieceIndex = board.getPieceAt(row, col)
+                if (pieceIndex != null) {
+                    val piece = Image(skin.getDrawable("checkbox-on"))
+                    piece.setColor(players[pieceIndex].color) // assume player has color
+                    cellStack.add(piece)
+                }
+
+                // move highlight
+                if (intendedAction == Main.TurnAction.MOVE) {
+                    val legalMoves = ValidMoves(players[currentPlayerIndex].position.first, players[currentPlayerIndex].position.second)
+                    if (Pair(row,col) in legalMoves) {
+                        val highlight = Image(skin.getDrawable("white"))
+                        highlight.color = Color(0f, .25f, 1f, 0.3f)
+                        cellStack.add(highlight)
+
+                        cellStack.addListener(object : ClickListener() {
+                            override fun clicked(event: InputEvent?, x2: Float, y2: Float) {
+                                // execute move
+                                performMove(Pair(row, col))
+                            }
+                        })
+                    }
+                }
+
+                boardCells[row][col] = cellStack
+                table.add(cellStack).size(48f)
+            }
+            table.row()
+        }
+
+        // wall ghost (floats above board)
+        wallGhost = Image(skin.getDrawable("white"))
+        wallGhost.color = Color(0f,0f,1f,0.4f)
+        wallGhost.isVisible = false
+        table.addActor(wallGhost)
 
         return table
+    }
+
+    fun performMove(target: Pair<Int, Int>) {
+        board.spaces[target.first][target.second] = currentPlayerIndex.toString()[0]
+        board.spaces[players[currentPlayerIndex].position.first][players[currentPlayerIndex].position.second] = ' '
+        players[currentPlayerIndex].position = target
+        if(players[currentPlayerIndex].CheckWin()){
+            println("${players[currentPlayerIndex].playerName} wins!")
+            gameEnd = true
+        } else {
+            currentPlayerIndex = (currentPlayerIndex + 1) % players.count()
+        }
+        host.buildLayout()
     }
 }
