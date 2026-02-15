@@ -2,11 +2,14 @@ package com.andrewleetham.quoridor
 
 import com.badlogic.gdx.ApplicationAdapter
 import com.badlogic.gdx.Gdx
+import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
+import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.scenes.scene2d.ui.ButtonGroup
 import com.badlogic.gdx.scenes.scene2d.ui.CheckBox
+import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.scenes.scene2d.ui.Table
@@ -57,6 +60,7 @@ class Main : ApplicationAdapter() {
     override fun render() {
         Gdx.gl.glClearColor(.9f, .9f, .9f, 1f)
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT)
+        if (currentScreen == GameScreen.GAME) updateWallGhost()
         stage.act()
         stage.draw()
     }
@@ -216,14 +220,46 @@ class Main : ApplicationAdapter() {
         table.row()
 
         val turnOptionsTable = Table()
-        //Pending: Actually add and implement the turn choices (wall/move)
-        table.add(turnOptionsTable)
+        val label = Label("Move Options", skin)
+        turnOptionsTable.add(label)
+        turnOptionsTable.row()
+        var textButton = TextButton("Place Wall (Horizontal)", skin)
+        textButton.isDisabled = currentAction == (TurnAction.WALL_HORIZONTAL) || game.getCurrentPlayer().walls < 1
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentAction = TurnAction.WALL_HORIZONTAL
+                buildLayout()
+            }
+        })
+        turnOptionsTable.add(textButton).center().expandY()
+        turnOptionsTable.row()
+        textButton = TextButton("Place Wall (Vertical)", skin)
+        textButton.isDisabled = (currentAction == TurnAction.WALL_VERTICAL) || game.getCurrentPlayer().walls < 1
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentAction = TurnAction.WALL_VERTICAL
+                buildLayout()
+            }
+        })
+        turnOptionsTable.add(textButton).center().expandY()
+        turnOptionsTable.row()
+        textButton = TextButton("Move", skin)
+        textButton.isDisabled = currentAction == TurnAction.MOVE
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentAction = TurnAction.MOVE
+                buildLayout()
+            }
+        })
+        turnOptionsTable.add(textButton).center().expandY()
+        table.add(turnOptionsTable).grow()
 
         val boardTable = game.buildBoardTable(skin, currentAction)
+        boardTable.name = "boardTable"
         table.add(boardTable)
         table.row()
 
-        val textButton = TextButton("Help", skin)
+        textButton = TextButton("Help", skin)
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
                 currentScreen = GameScreen.HELP
@@ -234,6 +270,68 @@ class Main : ApplicationAdapter() {
 
         return  table
     }
+
+    fun updateWallGhost() {
+        val boardTable = root.findActor<Table>("boardTable")
+        val wallGhost = boardTable.findActor<Image>("wallGhost")
+        if (currentAction == TurnAction.MOVE) {
+            wallGhost.isVisible = false
+            return
+        }
+
+        val mouse = Vector2(Gdx.input.x.toFloat(), Gdx.input.y.toFloat())
+        stage.screenToStageCoordinates(mouse)
+
+        val cellSize = 48f
+        val gap = 12f
+
+        val local = Vector2(mouse)
+        boardTable.stageToLocalCoordinates(local)
+
+        // Remove table padding
+        local.x -= boardTable.padLeft
+        local.y -= boardTable.padBottom
+
+        val stride = cellSize + gap
+
+        var col = (local.x / stride).toInt()
+        var row = 8 - (local.y / stride).toInt()
+
+        // Furthest column and row can map to walls sensibly
+        if (col == 8) col = 7
+        if (row == 8) row = 7
+
+        // determine wall orientation
+        val horizontal = currentAction == TurnAction.WALL_HORIZONTAL
+
+
+        if (col !in 0..7 || row !in 0..7) {
+            wallGhost.isVisible = false
+            return
+        }
+
+        val legal = game.isLegalWallPlacement(row, col, horizontal)
+
+        wallGhost.isVisible = true
+        wallGhost.color = if (legal) Color(0f, 0f, 1f, 0.4f) else Color(1f,0f,0f,0.5f)
+
+
+        val cell = game.boardCells[row][col]
+        val stagePos = cell.localToStageCoordinates(Vector2(0f,0f))
+        val boardLocal = boardTable.stageToLocalCoordinates(stagePos)
+        if (horizontal) {
+            wallGhost.setSize(cellSize * 2 + gap, gap)
+            wallGhost.setPosition(boardLocal.x, boardLocal.y - gap)
+        } else {
+            wallGhost.setSize(gap, cellSize * 2 + gap)
+            wallGhost.setPosition(boardLocal.x + cellSize, boardLocal.y - stride)
+        }
+
+        if (legal && Gdx.input.justTouched()) {
+            game.placeWall(row, col, horizontal)
+        }
+    }
+
 }
 /*fun main() {
 

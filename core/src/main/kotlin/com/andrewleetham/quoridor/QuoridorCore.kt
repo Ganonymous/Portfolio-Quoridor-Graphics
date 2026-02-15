@@ -1,13 +1,17 @@
 package com.andrewleetham.quoridor
 
 import com.badlogic.gdx.graphics.Color
+import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.InputEvent
+import com.badlogic.gdx.scenes.scene2d.ui.Container
 import com.badlogic.gdx.scenes.scene2d.ui.Image
 import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import com.badlogic.gdx.scenes.scene2d.ui.Stack
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
+import com.badlogic.gdx.utils.Align
+import com.badlogic.gdx.utils.Scaling
 import java.lang.NumberFormatException
 import kotlin.math.abs
 import kotlin.random.Random
@@ -415,17 +419,20 @@ class QuoridorCore (val host: Main) {
 
         table.row()
         val label = Label("${players[currentPlayerIndex].playerName}'s Turn", skin)
-        table.add(label).colspan(2).center()
+        table.add(label).colspan(2).center().pad(10f)
 
 
         return table
     }
 
-    //fun getCurrentPlayer(): QuoridorPlayer {return players[currentPlayerIndex]}
+    fun getCurrentPlayer(): QuoridorPlayer {return players[currentPlayerIndex]}
 
     fun buildBoardTable(skin: Skin, intendedAction: Main.TurnAction): Table {
+        val cellSize = 48f
+        val gap = 12f
+
         val table = Table()
-        table.defaults().pad(6f) // groove spacing
+        table.defaults().pad(gap / 2) // groove spacing
         table.background = skin.getDrawable("rect")
 
 
@@ -444,8 +451,14 @@ class QuoridorCore (val host: Main) {
                 val pieceIndex = board.getPieceAt(row, col)
                 if (pieceIndex != null) {
                     val piece = Image(skin.getDrawable("checkbox-on"))
-                    piece.setColor(players[pieceIndex].color) // assume player has color
-                    cellStack.add(piece)
+                    piece.setScaling(Scaling.fill)
+                    piece.setColor(players[pieceIndex].color)
+
+                    val holder = Container(piece)
+                    holder.setSize(cellSize * .75f, cellSize * .75f)
+                    holder.align(Align.center)
+
+                    cellStack.add(holder)
                 }
 
                 // move highlight
@@ -471,10 +484,53 @@ class QuoridorCore (val host: Main) {
             table.row()
         }
 
+        table.pack()
+        table.layout()
+
+        // Place walls
+        val walls = board.wallIntersects
+
+        for (x in 0 until 8) {
+            for (y in 0 until 8) {
+                when (walls[x][y]) {
+                    QuoridorBoard.IntersectType.EMPTY -> { /* nothing */ }
+
+                    QuoridorBoard.IntersectType.HORIZONTAL -> {
+                        val wall = Image(skin.getDrawable("button")) // reuse drawable
+                        wall.setColor(Color.DARK_GRAY)
+
+                        // anchor to the bottom-left cell of the 2x2 intersection
+                        val cell = boardCells[x][y]
+                        val boardLocal = cell.localToActorCoordinates(table,Vector2(0f, 0f))
+
+                        wall.setSize(cellSize * 2 + gap, gap)
+                        wall.setPosition(boardLocal.x, boardLocal.y - gap)
+
+                        table.addActor(wall)
+                    }
+
+                    QuoridorBoard.IntersectType.VERTICAL -> {
+                        val wall = Image(skin.getDrawable("button"))
+                        wall.setColor(Color.DARK_GRAY)
+
+                        val cell = boardCells[x][y]
+                        val boardLocal = cell.localToActorCoordinates(table,Vector2(0f, 0f))
+
+                        wall.setSize(gap, cellSize * 2 + gap)
+                        wall.setPosition(boardLocal.x + cellSize, boardLocal.y - (cellSize + gap))
+
+                        table.addActor(wall)
+                    }
+                }
+            }
+        }
+
+
         // wall ghost (floats above board)
         wallGhost = Image(skin.getDrawable("white"))
         wallGhost.color = Color(0f,0f,1f,0.4f)
         wallGhost.isVisible = false
+        wallGhost.name = "wallGhost"
         table.addActor(wallGhost)
 
         return table
@@ -490,6 +546,46 @@ class QuoridorCore (val host: Main) {
         } else {
             currentPlayerIndex = (currentPlayerIndex + 1) % players.count()
         }
+        host.buildLayout()
+    }
+
+    fun isLegalWallPlacement( row: Int, col: Int, horizontal: Boolean): Boolean {
+        //Out-of-bounds walls are always illegal
+        if (col !in 0..board.boardSize - 2 || row !in 0..board.boardSize - 2) return false
+        var collision = board.wallIntersects[row][col] != QuoridorBoard.IntersectType.EMPTY
+        val wallType = if(horizontal) QuoridorBoard.IntersectType.HORIZONTAL else QuoridorBoard.IntersectType.VERTICAL
+        if (horizontal) {
+            collision = collision ||
+                (col != 0 && board.wallIntersects[row][col - 1] == wallType) ||
+                (col != board.boardSize - 2 && board.wallIntersects[row][col + 1] == wallType)
+        } else {
+            collision = collision ||
+                (row != 0 && board.wallIntersects[row - 1][col] == wallType) ||
+                (row != board.boardSize - 2 && board.wallIntersects[row + 1][col] == wallType)
+        }
+
+        if (!collision) {
+            board.wallIntersects[row][col] = wallType
+            var paths = true
+            for (player in players){
+                paths = paths && HasPath(player)
+            }
+            board.wallIntersects[row][col] = QuoridorBoard.IntersectType.EMPTY
+            return paths
+        }
+
+        return !collision
+    }
+    fun placeWall(row: Int, col: Int, horizontal: Boolean) {
+        //Block attempts to place out-of-bounds walls
+        if (col !in 0..board.boardSize - 2 || row !in 0..board.boardSize - 2) return
+        //Block attempts to place with no walls remaining
+        if (players[currentPlayerIndex].walls < 1) return
+
+        val newWall = if(horizontal) QuoridorBoard.IntersectType.HORIZONTAL else QuoridorBoard.IntersectType.VERTICAL
+        board.wallIntersects[row][col] = newWall
+        players[currentPlayerIndex].walls--
+        currentPlayerIndex = (currentPlayerIndex + 1) % players.count()
         host.buildLayout()
     }
 }
