@@ -19,7 +19,7 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport
 
 
 class Main : ApplicationAdapter() {
-    enum class GameScreen {MENU, RULES, HELP, GAME}
+    enum class GameScreen {MENU, RULES, HELP, GAME, WIN}
     enum class TurnAction {MOVE, WALL_VERTICAL, WALL_HORIZONTAL}
     private lateinit var skin: Skin
     private lateinit var stage: Stage
@@ -54,7 +54,39 @@ class Main : ApplicationAdapter() {
             GameScreen.RULES -> root.add(buildRulesScreen()).grow()
             GameScreen.HELP -> root.add(buildHelpScreen()).grow()
             GameScreen.GAME -> root.add(buildGameScreen()).grow()
+            GameScreen.WIN -> root.add(buildWinScreen()).grow()
         }
+    }
+
+    fun triggerWin() {
+        currentScreen = GameScreen.WIN
+    }
+
+    private fun buildWinScreen(): Table {
+        val table = Table()
+        table.defaults().pad(15f)
+        table.pad(30f)
+
+        //title
+        var label = Label("GAME OVER", skin)
+        label.setFontScale(1.5f)
+        table.add(label).center()
+        table.row()
+
+        label = Label("${game.getCurrentPlayer().playerName} wins!", skin)
+        table.add(label).center()
+        table.row()
+
+        val textButton = TextButton("Return to Menu", skin)
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentScreen = GameScreen.MENU
+                buildLayout()
+            }
+        })
+        table.add(textButton).center()
+
+        return table
     }
 
     override fun render() {
@@ -219,6 +251,10 @@ class Main : ApplicationAdapter() {
         table.add(playersTable).growX().colspan(2)
         table.row()
 
+        val boardTable = game.buildBoardTable(skin, currentAction)
+        boardTable.name = "boardTable"
+        table.add(boardTable).center().expandX()
+
         val turnOptionsTable = Table()
         val label = Label("Move Options", skin)
         turnOptionsTable.add(label)
@@ -254,9 +290,6 @@ class Main : ApplicationAdapter() {
         turnOptionsTable.add(textButton).center().expandY()
         table.add(turnOptionsTable).grow()
 
-        val boardTable = game.buildBoardTable(skin, currentAction)
-        boardTable.name = "boardTable"
-        table.add(boardTable)
         table.row()
 
         textButton = TextButton("Help", skin)

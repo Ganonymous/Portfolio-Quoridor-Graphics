@@ -21,7 +21,7 @@ class QuoridorCore (val host: Main) {
     private var board: QuoridorBoard = QuoridorBoard(1)
     private var currentPlayerIndex = -1
     private var gameEnd = false
-    lateinit var boardCells: Array<Array<Stack>>
+    lateinit var boardCells: Array<Array<Table>>
     lateinit var wallGhost: Image
 
     fun PrepareGame(playerCount: Int, boardSize: Int = 9): Boolean {
@@ -436,50 +436,56 @@ class QuoridorCore (val host: Main) {
         table.background = skin.getDrawable("rect")
 
 
-        boardCells = Array(9) { Array(9) { Stack() } }
+        boardCells = Array(9) { Array(9) { Table() } }
 
         for (row in 0 .. 8) { // board tracks top-down
             for (col in 0..8) {
-                val cellStack = Stack()
+                val cellTable = Table()
+                cellTable.background = skin.getDrawable("button-pressed")
+                cellTable.background?.let { cellTable.color = Color.LIGHT_GRAY }
 
-                val base = Image(skin.getDrawable("button-pressed"))
-                base.setColor(Color.LIGHT_GRAY)
-
-                cellStack.add(base)
-
-                // if a piece is here, draw it
+                // piece
                 val pieceIndex = board.getPieceAt(row, col)
                 if (pieceIndex != null) {
-                    val piece = Image(skin.getDrawable("checkbox-on"))
-                    piece.setScaling(Scaling.fill)
+                    val piece = Image(skin.getDrawable("radio-on"))
+                    piece.setScaling(Scaling.fit)
                     piece.setColor(players[pieceIndex].color)
 
-                    val holder = Container(piece)
-                    holder.setSize(cellSize * .75f, cellSize * .75f)
-                    holder.align(Align.center)
+                    // size relative to cell
+                    val pawnSize = cellSize
+                    piece.setSize(pawnSize, pawnSize)
+                    val xOffset = pawnSize * 0.1f
+                    piece.setPosition(
+                        ((cellSize - pawnSize) / 2f) + xOffset,
+                        (cellSize - pawnSize) / 2f
+                    )
 
-                    cellStack.add(holder)
+                    cellTable.addActor(piece)
                 }
 
-                // move highlight
+                // highlight
                 if (intendedAction == Main.TurnAction.MOVE) {
-                    val legalMoves = ValidMoves(players[currentPlayerIndex].position.first, players[currentPlayerIndex].position.second)
-                    if (Pair(row,col) in legalMoves) {
+                    val legalMoves = ValidMoves(
+                        players[currentPlayerIndex].position.first,
+                        players[currentPlayerIndex].position.second
+                    )
+                    if (Pair(row, col) in legalMoves) {
                         val highlight = Image(skin.getDrawable("white"))
                         highlight.color = Color(0f, .25f, 1f, 0.3f)
-                        cellStack.add(highlight)
+                        highlight.setSize(cellSize, cellSize)
+                        highlight.setPosition(0f, 0f)
+                        cellTable.addActor(highlight)
 
-                        cellStack.addListener(object : ClickListener() {
+                        cellTable.addListener(object : ClickListener() {
                             override fun clicked(event: InputEvent?, x2: Float, y2: Float) {
-                                // execute move
                                 performMove(Pair(row, col))
                             }
                         })
                     }
                 }
 
-                boardCells[row][col] = cellStack
-                table.add(cellStack).size(48f)
+                boardCells[row][col] = cellTable
+                table.add(cellTable).size(cellSize)
             }
             table.row()
         }
@@ -541,8 +547,7 @@ class QuoridorCore (val host: Main) {
         board.spaces[players[currentPlayerIndex].position.first][players[currentPlayerIndex].position.second] = ' '
         players[currentPlayerIndex].position = target
         if(players[currentPlayerIndex].CheckWin()){
-            println("${players[currentPlayerIndex].playerName} wins!")
-            gameEnd = true
+            host.triggerWin()
         } else {
             currentPlayerIndex = (currentPlayerIndex + 1) % players.count()
         }
