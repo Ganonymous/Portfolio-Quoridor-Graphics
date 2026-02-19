@@ -201,8 +201,9 @@
 		"fontColor": "black",
 		"up": "button",
 		"down": "button-pressed",
-		"over": "button-over"
-	},
+		"over": "button-over",
+        "disabled": "button-pressed"
+    },
 	"toggle": {
 		"font": "font",
 		"fontColor": "black",
