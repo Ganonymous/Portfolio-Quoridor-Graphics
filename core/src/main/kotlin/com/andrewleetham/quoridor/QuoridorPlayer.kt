@@ -10,14 +10,12 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
 
 
-class QuoridorPlayer(start: Pair<Int, Int>, boardSize: Int, var walls: Int, val playerName: String, val color: Color,
-                     val displayChar: Char) {
-    var position: Pair<Int, Int>
+class QuoridorPlayer(start: Pair<Int, Int>, boardSize: Int, var walls: Int, val playerName: String, val color: Color) {
+    var position: Pair<Int, Int> = start
     val winCoord: Int
     val winOnColumn: Boolean
 
     init{
-        position = start
         if (start.first == 0){
             //from top to bottom
             winCoord = boardSize - 1
@@ -38,22 +36,19 @@ class QuoridorPlayer(start: Pair<Int, Int>, boardSize: Int, var walls: Int, val 
         }
     }
 
-    fun CheckWin(): Boolean{
+    fun checkWin(): Boolean{
         return if(winOnColumn) position.second == winCoord else position.first == winCoord
     }
 
-    fun Display() {
-        println("$playerName [$displayChar], Walls Remaining: $walls")
-    }
 
     fun buildPlayerDisplay(skin: Skin): Table {
         val table = Table()
         table.defaults().pad(4f)
-        val backgroundmap = Pixmap(1, 1, Pixmap.Format.RGB888)
-        backgroundmap.setColor(color)
-        backgroundmap.fill()
-        val background = TextureRegionDrawable(TextureRegion(Texture(backgroundmap)))
-        backgroundmap.dispose()
+        val backgroundMap = Pixmap(1, 1, Pixmap.Format.RGB888)
+        backgroundMap.setColor(color)
+        backgroundMap.fill()
+        val background = TextureRegionDrawable(TextureRegion(Texture(backgroundMap)))
+        backgroundMap.dispose()
         table.background = background
         table.pad(10f)
 
