@@ -127,9 +127,9 @@ class Main : ApplicationAdapter() {
             override fun canCheck(button: CheckBox?, newState: Boolean): Boolean {
                 val returnVal = super.canCheck(button, newState)
                 when(checkedIndex){
-                    0 ->  readyToPlay = game.PrepareGame(2, 9)
-                    1 -> readyToPlay = game.PrepareGame(3, 9)
-                    2 -> readyToPlay = game.PrepareGame(4, 9)
+                    0 ->  readyToPlay = game.prepareGame(2, 9)
+                    1 -> readyToPlay = game.prepareGame(3, 9)
+                    2 -> readyToPlay = game.prepareGame(4, 9)
                     -1 -> readyToPlay = false
                 }
                 return returnVal
@@ -224,9 +224,10 @@ class Main : ApplicationAdapter() {
 
         label = Label("The boxes at the top of the screen show the players in order, as well as how many walls each has left.\n" +
             "Below that is a line saying whose turn it is.\n" +
-            "On the left are <PENDING, WHAT'S THE CONTROL> to allow you to choose to move your piece or place a wall.\n" +
-            "To the right is the board. <PENDING, DESCRIBE THE APPEARANCE>\n" +
-            "<PENDING, EXPLAIN HOW TO INPUT A MOVE>\n", skin )
+            "On the right are three buttons to allow you to choose to move your piece or place a wall. The system defaults to moving whenever the game loads, or to the same action as the previous player. If you have no walls remaining, the buttons for wall placement will not function.\n" +
+            "To the left is the board. Each space shows as a square. Each player's piece appears as a colored dotted circle of the same color as their box at the top of the screen. Walls appear as dark rectangles between the spaces. \n" +
+            "When you have selected to move your piece, the spaces you can move to are highlighted in blue. Click on one of these highlighted spaces to move there.\n" +
+            "When you have selected to place a wall, hovering the mouse over the board will add a preview of a wall based on the current mouse position. It will be blue if that is a legal place to put a wall, or red if you cannot put a wall there. When the preview is blue, simply click to place a wall at the preview position.", skin )
         label.setWrap(true)
         table.add(label).center().growX()
         table.row()
@@ -259,6 +260,7 @@ class Main : ApplicationAdapter() {
         val label = Label("Move Options", skin)
         turnOptionsTable.add(label)
         turnOptionsTable.row()
+        if (game.getCurrentPlayer().walls < 1) currentAction = TurnAction.MOVE
         var textButton = TextButton("Place Wall (Horizontal)", skin)
         textButton.isDisabled = currentAction == (TurnAction.WALL_HORIZONTAL) || game.getCurrentPlayer().walls < 1
         textButton.addListener(object : ChangeListener(){
@@ -366,53 +368,4 @@ class Main : ApplicationAdapter() {
     }
 
 }
-/*fun main() {
 
-    val game = QuoridorCore(this)
-    var command : Int
-    do {
-        println("Welcome to the Quoridor terminal version.")
-        println("Please choose an action:")
-        println("1. Read the rules")
-        println("2. Set up a game")
-        println("3. Start playing")
-        println("4. Exit")
-        println()
-        println("Enter the number for your choice: ")
-
-        var line = readln()
-        try {
-            command = line.toInt()
-        } catch (e: NumberFormatException){
-            command = 0
-            println("Enter a number")
-        }
-
-        when(command){
-            1 -> {
-                game.ShowRules()
-                println("Press enter to continue")
-                readln()
-            }
-            2 -> {
-                println("How many players? ")
-                line = readln()
-                try {
-                    val players = line.toInt()
-                    println(if (game.PrepareGame(players)) "Game is set up!" else "Something went wrong in setup, try again.")
-                } catch (e: NumberFormatException){
-                    println("Enter a number")
-                }
-                println("Press enter to return to the menu.")
-                readln()
-            }
-            3 -> game.RunGame()
-            4 -> println("Goodbye!")
-            0-> println()
-            else -> println("Invalid choice: '$command', try again.")
-        }
-
-
-    } while (command != 4)
-}
-*/
