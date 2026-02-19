@@ -28,29 +28,29 @@ class QuoridorCore (val host: Main) {
         board = QuoridorBoard(boardSize)
         when (playerCount) {
             2 -> {
-                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, boardSize + 1, "Player 1", Color.BLUE,'1')
+                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, boardSize + 1, "Player 1", Color.BLUE)
                 board.spaces[player1.position.first][player1.position.second] = '0'
-                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, boardSize + 1, "Player 2", Color.RED, '2')
+                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, boardSize + 1, "Player 2", Color.RED)
                 board.spaces[player2.position.first][player2.position.second] = '1'
                 players = arrayOf(player1, player2)
             }
             3 -> {
-                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", Color.BLUE, '1')
+                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", Color.BLUE)
                 board.spaces[player1.position.first][player1.position.second] = '0'
-                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", Color.RED, '2')
+                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", Color.RED)
                 board.spaces[player2.position.first][player2.position.second] = '1'
-                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", Color.GREEN, '3')
+                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", Color.GREEN)
                 board.spaces[player3.position.first][player3.position.second] = '2'
                 players = arrayOf(player1, player2, player3)
             }
             4 -> {
-                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", Color.BLUE, '1')
+                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", Color.BLUE)
                 board.spaces[player1.position.first][player1.position.second] = '0'
-                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", Color.RED, '2')
+                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", Color.RED)
                 board.spaces[player2.position.first][player2.position.second] = '1'
-                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", Color.GREEN, '3')
+                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", Color.GREEN)
                 board.spaces[player3.position.first][player3.position.second] = '2'
-                val player4 = QuoridorPlayer(Pair(boardSize - 1, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 4", Color.YELLOW, '4')
+                val player4 = QuoridorPlayer(Pair(boardSize - 1, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 4", Color.YELLOW)
                 board.spaces[player4.position.first][player4.position.second] = '3'
                 players = arrayOf(player1, player2, player3, player4)
             }
