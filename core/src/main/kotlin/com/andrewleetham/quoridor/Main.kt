@@ -19,7 +19,7 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport
 
 
 class Main : ApplicationAdapter() {
-    enum class GameScreen {MENU, RULES, HELP, GAME, WIN}
+    enum class GameScreen {MAIN_MENU, LOCAL_MENU, ONLINE_MENU, ONLINE_LOBBY, RULES, HELP, GAME, WIN}
     enum class TurnAction {MOVE, WALL_VERTICAL, WALL_HORIZONTAL}
     private lateinit var skin: Skin
     private lateinit var stage: Stage
@@ -33,12 +33,12 @@ class Main : ApplicationAdapter() {
         skin = Skin(Gdx.files.internal("metalui/metal-ui.json"))
 
         stage = Stage(ScreenViewport())
-        Gdx.input.setInputProcessor(stage)
+        Gdx.input.inputProcessor = stage
 
 
 
         game = QuoridorCore(this)
-        currentScreen = GameScreen.MENU
+        currentScreen = GameScreen.MAIN_MENU
         root = Table()
         root.setFillParent(true)
         stage.addActor(root)
@@ -50,7 +50,10 @@ class Main : ApplicationAdapter() {
     fun buildLayout() {
         root.clear()
         when (currentScreen) {
-            GameScreen.MENU -> root.add(buildMenuScreen()).grow()
+            GameScreen.MAIN_MENU -> root.add(buildMainMenuScreen()).grow()
+            GameScreen.ONLINE_MENU -> root.add(buildOnlineMenuScreen()).grow()
+            GameScreen.ONLINE_LOBBY -> root.add(buildOnlineLobbyScreen()).grow()
+            GameScreen.LOCAL_MENU -> root.add(buildLocalMenuScreen()).grow()
             GameScreen.RULES -> root.add(buildRulesScreen()).grow()
             GameScreen.HELP -> root.add(buildHelpScreen()).grow()
             GameScreen.GAME -> root.add(buildGameScreen()).grow()
@@ -58,11 +61,70 @@ class Main : ApplicationAdapter() {
         }
     }
 
+    fun buildMainMenuScreen(): Table {
+        val table = Table()
+        table.defaults().pad(15f)
+        table.pad(30f)
+
+        //title
+        val label = Label("Welcome to Quoridor!", skin)
+        label.setFontScale(1.5f)
+        table.add(label).center()
+        table.row()
+
+        //Rules button
+        var textButton = TextButton("Rules", skin)
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentScreen = GameScreen.RULES
+                buildLayout()
+            }
+        })
+        table.add(textButton).center()
+        table.row()
+
+        //Online button
+        textButton = TextButton("Play Online", skin)
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentScreen = GameScreen.ONLINE_MENU
+                buildLayout()
+            }
+        })
+        table.add(textButton).center()
+        table.row()
+
+        //Local button
+        textButton = TextButton("Start Local Game", skin)
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentScreen = GameScreen.LOCAL_MENU
+                buildLayout()
+            }
+        })
+        table.add(textButton).center()
+        table.row()
+
+        return table
+    }
+
+    fun buildOnlineMenuScreen(): Table {
+        val table = Table()
+
+        return table
+    }
+
+    fun buildOnlineLobbyScreen(): Table {
+        val table = Table()
+
+        return table
+    }
+
     fun triggerWin() {
         currentScreen = GameScreen.WIN
     }
 
-    private fun buildWinScreen(): Table {
+    fun buildWinScreen(): Table {
         val table = Table()
         table.defaults().pad(15f)
         table.pad(30f)
@@ -80,7 +142,7 @@ class Main : ApplicationAdapter() {
         val textButton = TextButton("Return to Menu", skin)
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
-                currentScreen = GameScreen.MENU
+                currentScreen = GameScreen.MAIN_MENU
                 buildLayout()
             }
         })
@@ -106,13 +168,13 @@ class Main : ApplicationAdapter() {
         stage.dispose()
     }
 
-    fun buildMenuScreen(): Table {
+    fun buildLocalMenuScreen(): Table {
         val table = Table()
         table.defaults().pad(15f)
         table.pad(30f)
 
         //title
-        var label = Label("Welcome to Quoridor!", skin)
+        var label = Label("Start Local Game", skin)
         label.setFontScale(1.5f)
         table.add(label).center()
         table.row()
@@ -127,9 +189,9 @@ class Main : ApplicationAdapter() {
             override fun canCheck(button: CheckBox?, newState: Boolean): Boolean {
                 val returnVal = super.canCheck(button, newState)
                 when(checkedIndex){
-                    0 ->  readyToPlay = game.prepareGame(2, 9)
-                    1 -> readyToPlay = game.prepareGame(3, 9)
-                    2 -> readyToPlay = game.prepareGame(4, 9)
+                    0 -> readyToPlay = game.prepareGame(2)
+                    1 -> readyToPlay = game.prepareGame(3)
+                    2 -> readyToPlay = game.prepareGame(4)
                     -1 -> readyToPlay = false
                 }
                 return returnVal
@@ -149,19 +211,8 @@ class Main : ApplicationAdapter() {
         table.add(playerSelectTable)
         table.row()
 
-        //Rules button
-        var textButton = TextButton("Rules", skin)
-        textButton.addListener(object : ChangeListener(){
-            override fun changed(event: ChangeEvent?, actor: Actor?) {
-                currentScreen = GameScreen.RULES
-                buildLayout()
-            }
-        })
-        table.add(textButton).center()
-        table.row()
-
         //Start button
-        textButton = TextButton("Start Game", skin)
+        var textButton = TextButton("Start Game", skin)
         textButton.isDisabled = !readyToPlay
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
@@ -172,6 +223,15 @@ class Main : ApplicationAdapter() {
             }
         })
         table.add(textButton).center()
+        table.row()
+
+        textButton = TextButton("Return to Main Menu", skin)
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentScreen = GameScreen.MAIN_MENU
+                buildLayout()
+            }
+        })
 
 
         return  table
@@ -202,7 +262,7 @@ class Main : ApplicationAdapter() {
         val textButton = TextButton("Back to Menu", skin)
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
-                currentScreen = GameScreen.MENU
+                currentScreen = GameScreen.MAIN_MENU
                 buildLayout()
             }
         })

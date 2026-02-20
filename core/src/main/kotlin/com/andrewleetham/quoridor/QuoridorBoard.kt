@@ -8,7 +8,15 @@ class QuoridorBoard(val boardSize: Int){
     var wallIntersects: Array<Array<IntersectType>> = Array(boardSize - 1) { Array(boardSize - 1) {IntersectType.EMPTY} }
 
     fun getPieceAt(row: Int, col: Int): Int? {
-        if(spaces[row][col] != ' ') return spaces[row][col].toString().toInt()
-        else return null
+        return if(spaces[row][col] != ' ') spaces[row][col].toString().toInt()
+        else null
+    }
+
+    fun setWalls(placedWalls: List<List<com.andrewleetham.quoridorserver.model.IntersectType>>) {
+        for(row in placedWalls.indices) {
+            for (col in placedWalls[row].indices) {
+                wallIntersects[row][col] = IntersectType.valueOf(placedWalls[row][col].name)
+            }
+        }
     }
 }

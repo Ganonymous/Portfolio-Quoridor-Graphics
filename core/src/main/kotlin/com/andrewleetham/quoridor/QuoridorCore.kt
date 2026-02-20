@@ -1,5 +1,8 @@
 package com.andrewleetham.quoridor
 
+import com.andrewleetham.quoridorserver.model.IntersectType
+import com.andrewleetham.quoridorserver.model.PlayerState
+import com.andrewleetham.quoridorserver.model.RunningGameState
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.InputEvent
@@ -13,15 +16,73 @@ import kotlin.math.abs
 import kotlin.random.Random
 
 class QuoridorCore (val host: Main) {
+    private val boardSize = 9
     private var players: Array<QuoridorPlayer> = emptyArray()
-    private var board: QuoridorBoard = QuoridorBoard(1)
+    private var board: QuoridorBoard = QuoridorBoard(9)
     private var currentPlayerIndex = -1
     private var gameEnd = false
     lateinit var boardCells: Array<Array<Table>>
     lateinit var wallGhost: Image
+    lateinit var gameID: String
 
-    fun prepareGame(playerCount: Int, boardSize: Int = 9): Boolean {
-        if (playerCount !in 2..4 || boardSize < 3){
+    fun fromRunningGameState(state: RunningGameState){
+        gameID = state.id
+        board = QuoridorBoard(boardSize)
+        val playerList = mutableListOf<QuoridorPlayer>()
+        for( i in 0 until state.players.count()){
+            val playerState = state.players[i]
+            val start = when(i){
+                0 -> Pair(boardSize / 2, 0)
+                1 -> Pair(boardSize / 2, boardSize - 1)
+                2 -> Pair(0, boardSize / 2)
+                3 -> Pair(0, boardSize - 1)
+                else -> Pair(-1, -1)
+            }
+
+            val color = when(i){
+                0 -> Color.BLUE
+                1 -> Color.RED
+                2 -> Color.GREEN
+                3 -> Color.YELLOW
+                else -> Color.GRAY
+            }
+            val player = QuoridorPlayer(start, boardSize, playerState.walls, playerState.name, color)
+            player.position = playerState.position
+            board.spaces[player.position.first][player.position.second] = i.toString()[0]
+            playerList.add(player)
+        }
+        players = playerList.toTypedArray()
+        currentPlayerIndex = state.currentPlayerIndex
+        board.setWalls(state.placedWalls)
+
+    }
+
+    fun toRunningGameState(): RunningGameState {
+        val playerStates = mutableListOf<PlayerState>()
+        for (player in players) {
+            val state = PlayerState(player.playerName, player.position, player.walls)
+            playerStates.add(state)
+        }
+
+        val placedWalls = prepareBoardState()
+
+        return RunningGameState(gameID, playerStates, currentPlayerIndex, placedWalls)
+    }
+
+    fun prepareBoardState(): List<List<IntersectType>> {
+        val boardState = mutableListOf<MutableList<IntersectType>>()
+        for(row in 0 until boardSize - 1){
+            val rowState = mutableListOf<IntersectType>()
+            for (col in 0 until boardSize - 1){
+                rowState.add(IntersectType.valueOf(board.wallIntersects[row][col].name))
+            }
+            boardState.add(rowState)
+        }
+        return boardState
+    }
+
+    fun prepareGame(playerCount: Int): Boolean {
+        if (playerCount !in 2..4){
             println("Invalid Starting conditions")
             return false
         }
