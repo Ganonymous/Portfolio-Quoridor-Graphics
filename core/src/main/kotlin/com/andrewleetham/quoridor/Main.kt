@@ -1,11 +1,15 @@
 package com.andrewleetham.quoridor
 
+import com.andrewleetham.quoridor.controller.LocalController
+import com.andrewleetham.quoridor.controller.QuoridorController
+import com.andrewleetham.quoridorserver.model.RunningGameState
 import com.badlogic.gdx.ApplicationAdapter
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.Actor
+import com.badlogic.gdx.scenes.scene2d.InputEvent
 import com.badlogic.gdx.scenes.scene2d.Stage
 import com.badlogic.gdx.scenes.scene2d.ui.ButtonGroup
 import com.badlogic.gdx.scenes.scene2d.ui.CheckBox
@@ -15,6 +19,8 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
+import com.badlogic.gdx.utils.Scaling
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 
 
@@ -23,7 +29,7 @@ class Main : ApplicationAdapter() {
     enum class TurnAction {MOVE, WALL_VERTICAL, WALL_HORIZONTAL}
     private lateinit var skin: Skin
     private lateinit var stage: Stage
-    private lateinit var game : QuoridorCore
+    private lateinit var controller: QuoridorController
     private lateinit var currentScreen: GameScreen
     private var readyToPlay = false
     private lateinit var root: Table
@@ -37,7 +43,6 @@ class Main : ApplicationAdapter() {
 
 
 
-        game = QuoridorCore(this)
         currentScreen = GameScreen.MAIN_MENU
         root = Table()
         root.setFillParent(true)
@@ -99,6 +104,10 @@ class Main : ApplicationAdapter() {
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
                 currentScreen = GameScreen.LOCAL_MENU
+                controller = LocalController(QuoridorCore(), "Local", onStateUpdated = {
+                    currentScreen = if((controller as LocalController).gameWon) GameScreen.WIN else GameScreen.GAME
+                    buildLayout()
+                })
                 buildLayout()
             }
         })
@@ -120,9 +129,6 @@ class Main : ApplicationAdapter() {
         return table
     }
 
-    fun triggerWin() {
-        currentScreen = GameScreen.WIN
-    }
 
     fun buildWinScreen(): Table {
         val table = Table()
@@ -135,7 +141,7 @@ class Main : ApplicationAdapter() {
         table.add(label).center()
         table.row()
 
-        label = Label("${game.getCurrentPlayer().playerName} wins!", skin)
+        label = Label("${controller.getWinningPlayer()!!.playerName} wins!", skin)
         table.add(label).center()
         table.row()
 
@@ -169,6 +175,8 @@ class Main : ApplicationAdapter() {
     }
 
     fun buildLocalMenuScreen(): Table {
+        val localController = controller as LocalController
+
         val table = Table()
         table.defaults().pad(15f)
         table.pad(30f)
@@ -189,9 +197,9 @@ class Main : ApplicationAdapter() {
             override fun canCheck(button: CheckBox?, newState: Boolean): Boolean {
                 val returnVal = super.canCheck(button, newState)
                 when(checkedIndex){
-                    0 -> readyToPlay = game.prepareGame(2)
-                    1 -> readyToPlay = game.prepareGame(3)
-                    2 -> readyToPlay = game.prepareGame(4)
+                    0 -> readyToPlay = localController.prepareGame(2)
+                    1 -> readyToPlay = localController.prepareGame(3)
+                    2 -> readyToPlay = localController.prepareGame(4)
                     -1 -> readyToPlay = false
                 }
                 return returnVal
@@ -216,7 +224,7 @@ class Main : ApplicationAdapter() {
         textButton.isDisabled = !readyToPlay
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
-                game.startGame()
+                localController.startGame()
                 currentAction = TurnAction.MOVE
                 currentScreen = GameScreen.GAME
                 buildLayout()
@@ -305,14 +313,15 @@ class Main : ApplicationAdapter() {
     }
 
     fun buildGameScreen(): Table {
+        val state = controller.getGameState()
         val table = Table()
 
         //Display the players
-        val playersTable = game.buildPlayersTable(skin)
+        val playersTable = buildPlayersTable(state)
         table.add(playersTable).growX().colspan(2)
         table.row()
 
-        val boardTable = game.buildBoardTable(skin, currentAction)
+        val boardTable = buildBoardTable(state)
         boardTable.name = "boardTable"
         table.add(boardTable).center().expandX()
 
@@ -320,9 +329,9 @@ class Main : ApplicationAdapter() {
         val label = Label("Move Options", skin)
         turnOptionsTable.add(label)
         turnOptionsTable.row()
-        if (game.getCurrentPlayer().walls < 1) currentAction = TurnAction.MOVE
+        if (state.players[state.currentPlayerIndex].walls < 1) currentAction = TurnAction.MOVE
         var textButton = TextButton("Place Wall (Horizontal)", skin)
-        textButton.isDisabled = currentAction == (TurnAction.WALL_HORIZONTAL) || game.getCurrentPlayer().walls < 1
+        textButton.isDisabled = currentAction == (TurnAction.WALL_HORIZONTAL) || state.players[state.currentPlayerIndex].walls < 1
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
                 currentAction = TurnAction.WALL_HORIZONTAL
@@ -332,7 +341,7 @@ class Main : ApplicationAdapter() {
         turnOptionsTable.add(textButton).center().expandY()
         turnOptionsTable.row()
         textButton = TextButton("Place Wall (Vertical)", skin)
-        textButton.isDisabled = (currentAction == TurnAction.WALL_VERTICAL) || game.getCurrentPlayer().walls < 1
+        textButton.isDisabled = (currentAction == TurnAction.WALL_VERTICAL) || state.players[state.currentPlayerIndex].walls < 1
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
                 currentAction = TurnAction.WALL_VERTICAL
@@ -404,14 +413,15 @@ class Main : ApplicationAdapter() {
             wallGhost.isVisible = false
             return
         }
-
-        val legal = game.isLegalWallPlacement(row, col, horizontal)
+        val core = QuoridorCore()
+        core.fromRunningGameState(controller.getGameState())
+        val legal = core.isLegalWallPlacement(Pair(row, col), horizontal)
 
         wallGhost.isVisible = true
         wallGhost.color = if (legal) Color(0f, 0f, 1f, 0.4f) else Color(1f,0f,0f,0.5f)
 
 
-        val cell = game.boardCells[row][col]
+        val cell = root.findActor<Table>("Cell-$row-$col")
         val stagePos = cell.localToStageCoordinates(Vector2(0f,0f))
         val boardLocal = boardTable.stageToLocalCoordinates(stagePos)
         if (horizontal) {
@@ -423,9 +433,149 @@ class Main : ApplicationAdapter() {
         }
 
         if (legal && Gdx.input.justTouched()) {
-            game.placeWall(row, col, horizontal)
+            controller.requestWall(Pair(row, col), horizontal)
         }
     }
+
+    fun buildPlayersTable(state: RunningGameState): Table{
+        val table = Table()
+
+        table.add(QuoridorPlayer.fromPlayerState(state.players[0]).buildPlayerDisplay(skin)).growX()
+        table.add(QuoridorPlayer.fromPlayerState(state.players[1]).buildPlayerDisplay(skin)).growX()
+        if(state.players.count() > 2){
+            table.row()
+            table.add(QuoridorPlayer.fromPlayerState(state.players[2]).buildPlayerDisplay(skin)).growX()
+            if (state.players.count() == 4){
+                table.add(QuoridorPlayer.fromPlayerState(state.players[3]).buildPlayerDisplay(skin)).growX()
+            }
+        }
+
+        table.row()
+        val label = Label("${state.players[state.currentPlayerIndex].name}'s Turn", skin)
+        table.add(label).colspan(2).center().pad(10f)
+
+
+        return table
+    }
+
+    fun buildBoardTable(state: RunningGameState): Table {
+        val core = QuoridorCore()
+        core.fromRunningGameState(state)
+        val cellSize = 48f
+        val gap = 12f
+
+        val table = Table()
+        table.defaults().pad(gap / 2) // groove spacing
+        table.background = skin.getDrawable("rect")
+
+
+        val boardCells = Array(9) { Array(9) { Table() } }
+
+        for (row in 0 .. 8) { // board tracks top-down
+            for (col in 0..8) {
+                val cellTable = Table()
+                cellTable.name = "Cell-$row-$col"
+                cellTable.background = skin.getDrawable("button-pressed")
+                cellTable.background?.let { cellTable.color = Color.LIGHT_GRAY }
+
+                // piece
+                val pieceIndex = core.getPieceAt(row, col)
+                if (pieceIndex != null) {
+                    val piece = Image(skin.getDrawable("radio-on"))
+                    piece.setScaling(Scaling.fit)
+                    piece.setColor(core.getPlayer(pieceIndex).color)
+
+                    // size relative to cell
+                    val pawnSize = cellSize
+                    piece.setSize(pawnSize, pawnSize)
+                    val xOffset = pawnSize * 0.1f
+                    piece.setPosition(
+                        ((cellSize - pawnSize) / 2f) + xOffset,
+                        (cellSize - pawnSize) / 2f
+                    )
+
+                    cellTable.addActor(piece)
+                }
+
+                // highlight
+                if (currentAction == TurnAction.MOVE) {
+                    val legalMoves = core.validMoves(
+                        core.getPlayer(state.currentPlayerIndex).position.first,
+                        core.getPlayer(state.currentPlayerIndex).position.second
+                    )
+                    if (Pair(row, col) in legalMoves) {
+                        val highlight = Image(skin.getDrawable("white"))
+                        highlight.color = Color(0f, .25f, 1f, 0.3f)
+                        highlight.setSize(cellSize, cellSize)
+                        highlight.setPosition(0f, 0f)
+                        cellTable.addActor(highlight)
+
+                        cellTable.addListener(object : ClickListener() {
+                            override fun clicked(event: InputEvent?, x2: Float, y2: Float) {
+                                controller.requestMove(Pair(row, col))
+                            }
+                        })
+                    }
+                }
+
+                boardCells[row][col] = cellTable
+                table.add(cellTable).size(cellSize)
+            }
+            table.row()
+        }
+
+        table.pack()
+        table.layout()
+
+        // Place walls
+        val walls = core.getIntersects()
+
+        for (x in 0 until 8) {
+            for (y in 0 until 8) {
+                when (walls[x][y]) {
+                    QuoridorBoard.IntersectType.EMPTY -> { /* nothing */ }
+
+                    QuoridorBoard.IntersectType.HORIZONTAL -> {
+                        val wall = Image(skin.getDrawable("button")) // reuse drawable
+                        wall.setColor(Color.DARK_GRAY)
+
+                        // anchor to the bottom-left cell of the 2x2 intersection
+                        val cell = boardCells[x][y]
+                        val boardLocal = cell.localToActorCoordinates(table,Vector2(0f, 0f))
+
+                        wall.setSize(cellSize * 2 + gap, gap)
+                        wall.setPosition(boardLocal.x, boardLocal.y - gap)
+
+                        table.addActor(wall)
+                    }
+
+                    QuoridorBoard.IntersectType.VERTICAL -> {
+                        val wall = Image(skin.getDrawable("button"))
+                        wall.setColor(Color.DARK_GRAY)
+
+                        val cell = boardCells[x][y]
+                        val boardLocal = cell.localToActorCoordinates(table,Vector2(0f, 0f))
+
+                        wall.setSize(gap, cellSize * 2 + gap)
+                        wall.setPosition(boardLocal.x + cellSize, boardLocal.y - (cellSize + gap))
+
+                        table.addActor(wall)
+                    }
+                }
+            }
+        }
+
+
+        // wall ghost (floats above board)
+        val wallGhost = Image(skin.getDrawable("white"))
+        wallGhost.color = Color(0f,0f,1f,0.4f)
+        wallGhost.isVisible = false
+        wallGhost.name = "wallGhost"
+        table.addActor(wallGhost)
+
+        return table
+    }
+
 
 }
 

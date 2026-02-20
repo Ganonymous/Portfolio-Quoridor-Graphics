@@ -1,53 +1,38 @@
 package com.andrewleetham.quoridor
 
 import com.andrewleetham.quoridorserver.model.IntersectType
+import com.andrewleetham.quoridorserver.model.PlayerColor
 import com.andrewleetham.quoridorserver.model.PlayerState
 import com.andrewleetham.quoridorserver.model.RunningGameState
 import com.badlogic.gdx.graphics.Color
-import com.badlogic.gdx.math.Vector2
-import com.badlogic.gdx.scenes.scene2d.InputEvent
-import com.badlogic.gdx.scenes.scene2d.ui.Image
-import com.badlogic.gdx.scenes.scene2d.ui.Label
-import com.badlogic.gdx.scenes.scene2d.ui.Table
-import com.badlogic.gdx.scenes.scene2d.ui.Skin
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
-import com.badlogic.gdx.utils.Scaling
 import kotlin.math.abs
 import kotlin.random.Random
 
-class QuoridorCore (val host: Main) {
+class QuoridorCore () {
     private val boardSize = 9
     private var players: Array<QuoridorPlayer> = emptyArray()
     private var board: QuoridorBoard = QuoridorBoard(9)
     private var currentPlayerIndex = -1
     private var gameEnd = false
-    lateinit var boardCells: Array<Array<Table>>
-    lateinit var wallGhost: Image
-    lateinit var gameID: String
-
     fun fromRunningGameState(state: RunningGameState){
-        gameID = state.id
         board = QuoridorBoard(boardSize)
         val playerList = mutableListOf<QuoridorPlayer>()
-        for( i in 0 until state.players.count()){
-            val playerState = state.players[i]
+        for( (i, ps) in state.players.withIndex()){
             val start = when(i){
                 0 -> Pair(boardSize / 2, 0)
                 1 -> Pair(boardSize / 2, boardSize - 1)
                 2 -> Pair(0, boardSize / 2)
-                3 -> Pair(0, boardSize - 1)
-                else -> Pair(-1, -1)
+                else -> Pair(0, boardSize - 1)
             }
 
             val color = when(i){
                 0 -> Color.BLUE
                 1 -> Color.RED
                 2 -> Color.GREEN
-                3 -> Color.YELLOW
-                else -> Color.GRAY
+                else -> Color.YELLOW
             }
-            val player = QuoridorPlayer(start, boardSize, playerState.walls, playerState.name, color)
-            player.position = playerState.position
+            val player = QuoridorPlayer(start, boardSize, ps.walls, ps.name, color)
+            player.position = ps.position
             board.spaces[player.position.first][player.position.second] = i.toString()[0]
             playerList.add(player)
         }
@@ -57,29 +42,20 @@ class QuoridorCore (val host: Main) {
 
     }
 
-    fun toRunningGameState(): RunningGameState {
-        val playerStates = mutableListOf<PlayerState>()
-        for (player in players) {
-            val state = PlayerState(player.playerName, player.position, player.walls)
-            playerStates.add(state)
-        }
-
-        val placedWalls = prepareBoardState()
-
-        return RunningGameState(gameID, playerStates, currentPlayerIndex, placedWalls)
-    }
-
-    fun prepareBoardState(): List<List<IntersectType>> {
-        val boardState = mutableListOf<MutableList<IntersectType>>()
-        for(row in 0 until boardSize - 1){
-            val rowState = mutableListOf<IntersectType>()
-            for (col in 0 until boardSize - 1){
-                rowState.add(IntersectType.valueOf(board.wallIntersects[row][col].name))
+    fun toRunningGameState(gameID: String): RunningGameState {
+        return RunningGameState(
+            gameID,
+            players = players.map{
+                PlayerState(it.playerName, it.position, it.walls, PlayerColor.fromGDXColor(it.color))
+            },
+            currentPlayerIndex,
+            placedWalls = board.wallIntersects.map{
+                row -> row.map{
+                    IntersectType.valueOf(it.name)
             }
-            boardState.add(rowState)
-        }
-        return boardState
+            })
     }
+
 
     fun prepareGame(playerCount: Int): Boolean {
         if (playerCount !in 2..4){
@@ -295,157 +271,31 @@ class QuoridorCore (val host: Main) {
     }
 
 
-    fun buildPlayersTable(skin: Skin): Table{
-        val table = Table()
 
-        table.add(players[0].buildPlayerDisplay(skin)).growX()
-        table.add(players[1].buildPlayerDisplay(skin)).growX()
-        if(players.count() > 2){
-            table.row()
-            table.add(players[2].buildPlayerDisplay(skin)).growX()
-            if (players.count() == 4){
-                table.add(players[3].buildPlayerDisplay(skin)).growX()
-            }
-        }
-
-        table.row()
-        val label = Label("${players[currentPlayerIndex].playerName}'s Turn", skin)
-        table.add(label).colspan(2).center().pad(10f)
-
-
-        return table
-    }
-
+    fun getPlayer(index: Int): QuoridorPlayer {return players[index]}
     fun getCurrentPlayer(): QuoridorPlayer {return players[currentPlayerIndex]}
 
-    fun buildBoardTable(skin: Skin, intendedAction: Main.TurnAction): Table {
-        val cellSize = 48f
-        val gap = 12f
 
-        val table = Table()
-        table.defaults().pad(gap / 2) // groove spacing
-        table.background = skin.getDrawable("rect")
+    fun applyMove(target: Pair<Int, Int>): Boolean {
+        val currentPlayer = players[currentPlayerIndex]
+        val legal = validMoves(currentPlayer.position.first, currentPlayer.position.second)
 
+        if(target !in legal) {return false}
 
-        boardCells = Array(9) { Array(9) { Table() } }
-
-        for (row in 0 .. 8) { // board tracks top-down
-            for (col in 0..8) {
-                val cellTable = Table()
-                cellTable.background = skin.getDrawable("button-pressed")
-                cellTable.background?.let { cellTable.color = Color.LIGHT_GRAY }
-
-                // piece
-                val pieceIndex = board.getPieceAt(row, col)
-                if (pieceIndex != null) {
-                    val piece = Image(skin.getDrawable("radio-on"))
-                    piece.setScaling(Scaling.fit)
-                    piece.setColor(players[pieceIndex].color)
-
-                    // size relative to cell
-                    val pawnSize = cellSize
-                    piece.setSize(pawnSize, pawnSize)
-                    val xOffset = pawnSize * 0.1f
-                    piece.setPosition(
-                        ((cellSize - pawnSize) / 2f) + xOffset,
-                        (cellSize - pawnSize) / 2f
-                    )
-
-                    cellTable.addActor(piece)
-                }
-
-                // highlight
-                if (intendedAction == Main.TurnAction.MOVE) {
-                    val legalMoves = validMoves(
-                        players[currentPlayerIndex].position.first,
-                        players[currentPlayerIndex].position.second
-                    )
-                    if (Pair(row, col) in legalMoves) {
-                        val highlight = Image(skin.getDrawable("white"))
-                        highlight.color = Color(0f, .25f, 1f, 0.3f)
-                        highlight.setSize(cellSize, cellSize)
-                        highlight.setPosition(0f, 0f)
-                        cellTable.addActor(highlight)
-
-                        cellTable.addListener(object : ClickListener() {
-                            override fun clicked(event: InputEvent?, x2: Float, y2: Float) {
-                                performMove(Pair(row, col))
-                            }
-                        })
-                    }
-                }
-
-                boardCells[row][col] = cellTable
-                table.add(cellTable).size(cellSize)
-            }
-            table.row()
-        }
-
-        table.pack()
-        table.layout()
-
-        // Place walls
-        val walls = board.wallIntersects
-
-        for (x in 0 until 8) {
-            for (y in 0 until 8) {
-                when (walls[x][y]) {
-                    QuoridorBoard.IntersectType.EMPTY -> { /* nothing */ }
-
-                    QuoridorBoard.IntersectType.HORIZONTAL -> {
-                        val wall = Image(skin.getDrawable("button")) // reuse drawable
-                        wall.setColor(Color.DARK_GRAY)
-
-                        // anchor to the bottom-left cell of the 2x2 intersection
-                        val cell = boardCells[x][y]
-                        val boardLocal = cell.localToActorCoordinates(table,Vector2(0f, 0f))
-
-                        wall.setSize(cellSize * 2 + gap, gap)
-                        wall.setPosition(boardLocal.x, boardLocal.y - gap)
-
-                        table.addActor(wall)
-                    }
-
-                    QuoridorBoard.IntersectType.VERTICAL -> {
-                        val wall = Image(skin.getDrawable("button"))
-                        wall.setColor(Color.DARK_GRAY)
-
-                        val cell = boardCells[x][y]
-                        val boardLocal = cell.localToActorCoordinates(table,Vector2(0f, 0f))
-
-                        wall.setSize(gap, cellSize * 2 + gap)
-                        wall.setPosition(boardLocal.x + cellSize, boardLocal.y - (cellSize + gap))
-
-                        table.addActor(wall)
-                    }
-                }
-            }
-        }
-
-
-        // wall ghost (floats above board)
-        wallGhost = Image(skin.getDrawable("white"))
-        wallGhost.color = Color(0f,0f,1f,0.4f)
-        wallGhost.isVisible = false
-        wallGhost.name = "wallGhost"
-        table.addActor(wallGhost)
-
-        return table
-    }
-
-    fun performMove(target: Pair<Int, Int>) {
         board.spaces[target.first][target.second] = currentPlayerIndex.toString()[0]
-        board.spaces[players[currentPlayerIndex].position.first][players[currentPlayerIndex].position.second] = ' '
-        players[currentPlayerIndex].position = target
-        if(players[currentPlayerIndex].checkWin()){
-            host.triggerWin()
-        } else {
-            currentPlayerIndex = (currentPlayerIndex + 1) % players.count()
-        }
-        host.buildLayout()
+        board.spaces[currentPlayer.position.first][currentPlayer.position.second] = ' '
+        currentPlayer.position = target
+
+        return true
     }
 
-    fun isLegalWallPlacement( row: Int, col: Int, horizontal: Boolean): Boolean {
+    fun nextTurn() {
+        currentPlayerIndex = (currentPlayerIndex + 1) % players.count()
+    }
+
+    fun isLegalWallPlacement( target: Pair<Int, Int>, horizontal: Boolean): Boolean {
+        val row = target.first
+        val col = target.second
         //Out-of-bounds walls are always illegal
         if (col !in 0..board.boardSize - 2 || row !in 0..board.boardSize - 2) return false
         var collision = board.wallIntersects[row][col] != QuoridorBoard.IntersectType.EMPTY
@@ -473,16 +323,26 @@ class QuoridorCore (val host: Main) {
         return !collision
     }
 
-    fun placeWall(row: Int, col: Int, horizontal: Boolean) {
+    fun applyWall(target: Pair<Int, Int>, horizontal: Boolean): Boolean {
         //Block attempts to place out-of-bounds walls
-        if (col !in 0..board.boardSize - 2 || row !in 0..board.boardSize - 2) return
+        if (!isLegalWallPlacement(target, horizontal)) return false
         //Block attempts to place with no walls remaining
-        if (players[currentPlayerIndex].walls < 1) return
+        if (players[currentPlayerIndex].walls < 1) return false
 
-        val newWall = if(horizontal) QuoridorBoard.IntersectType.HORIZONTAL else QuoridorBoard.IntersectType.VERTICAL
-        board.wallIntersects[row][col] = newWall
+        board.wallIntersects[target.first][target.second] =
+            if (horizontal) QuoridorBoard.IntersectType.HORIZONTAL else QuoridorBoard.IntersectType.VERTICAL
+
         players[currentPlayerIndex].walls--
         currentPlayerIndex = (currentPlayerIndex + 1) % players.count()
-        host.buildLayout()
+        return true
+    }
+
+    fun getPieceAt(row: Int, col: Int): Int? {
+        return if(board.spaces[row][col] != ' ') board.spaces[row][col].toString().toInt()
+        else null
+    }
+
+    fun getIntersects(): Array<Array<QuoridorBoard.IntersectType>> {
+        return board.wallIntersects
     }
 }

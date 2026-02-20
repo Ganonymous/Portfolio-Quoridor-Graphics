@@ -1,5 +1,6 @@
 package com.andrewleetham.quoridor
 
+import com.andrewleetham.quoridorserver.model.PlayerState
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.Pixmap
 import com.badlogic.gdx.graphics.Texture
@@ -66,6 +67,12 @@ class QuoridorPlayer(start: Pair<Int, Int>, boardSize: Int, var walls: Int, val 
         }
 
         return table
+    }
+
+    companion object {
+        fun fromPlayerState(state: PlayerState): QuoridorPlayer {
+            return QuoridorPlayer(Pair(0,0), 9, state.walls, state.name, state.color.toGdxColor())
+        }
     }
 
 }

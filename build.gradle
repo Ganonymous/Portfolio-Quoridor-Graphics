@@ -8,7 +8,7 @@ buildscript {
   }
   dependencies {
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
-
+    classpath "org.jetbrains.kotlin:kotlin-serialization:$kotlinVersion"
   }
 }
 
@@ -28,6 +28,7 @@ allprojects {
 configure(subprojects) {
   apply plugin: 'java-library'
   apply plugin: 'kotlin'
+  apply plugin: 'kotlinx-serialization'
   java.sourceCompatibility = 8
 
   // From https://lyze.dev/2021/04/29/libGDX-Internal-Assets-List/
@@ -55,7 +56,7 @@ configure(subprojects) {
   }
   compileKotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
   compileTestKotlin.compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
-  
+
 }
 
 subprojects {

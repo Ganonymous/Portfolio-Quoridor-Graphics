@@ -37,7 +37,6 @@ dependencies {
 
   if(enableGraalNative == 'true') {
     implementation "io.github.berstanio:gdx-svmhelper-backend-lwjgl3:$graalHelperVersion"
-
     }
 }
 
