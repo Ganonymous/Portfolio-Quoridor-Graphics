@@ -48,7 +48,7 @@ class Main : ApplicationAdapter() {
 
     override fun create() {
         skin = Skin(Gdx.files.internal("metalui/metal-ui.json"))
-        proxy = ServerProxy.Instance()
+        proxy = ServerProxy.retrieveInstance()
         stage = Stage(ScreenViewport())
         Gdx.input.inputProcessor = stage
 
@@ -109,6 +109,9 @@ class Main : ApplicationAdapter() {
     }
 
     fun buildMainMenuScreen(): Table {
+        if (controller is OnlineController){
+            (controller as OnlineController).stopPolling()
+        }
         val table = Table()
         table.defaults().pad(15f)
         table.pad(30f)
@@ -146,6 +149,7 @@ class Main : ApplicationAdapter() {
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
                 currentScreen = GameScreen.LOCAL_MENU
+                (controller as? OnlineController)?.dispose()
                 controller = LocalController(QuoridorCore(), "Local", onStateUpdated = {
                     currentScreen = if((controller as LocalController).gameWon) GameScreen.WIN else GameScreen.GAME
                     buildLayout()
@@ -183,21 +187,30 @@ class Main : ApplicationAdapter() {
         textButton.name = "createGameButton"
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
-                val result = proxy.createGame(name)
-                if (!result.success){
-                    message = "Failed to set up online game. Try again"
-                    buildLayout()
-                } else {
-                    myName = name
-                    controller = OnlineController(result.gameState!!.id, onStateUpdated = {
-                        currentScreen = when (it){
-                            is LobbyGameState -> GameScreen.ONLINE_LOBBY
-                            is RunningGameState -> GameScreen.GAME
-                            is FinishedGameState ->  GameScreen.WIN
-                        }
+                proxy.createGame(name) {result ->
+                    if (!result.success){
+                        message = "Failed to set up online game. Try again"
                         buildLayout()
-                    })
+                    } else {
+                        myName = name
+                        (controller as? OnlineController)?.dispose()
+                        controller = OnlineController(result.gameState!!.id, myName, onStateUpdated = {
+                            currentScreen = when (it){
+                                is LobbyGameState -> GameScreen.ONLINE_LOBBY
+                                is RunningGameState -> GameScreen.GAME
+                                is FinishedGameState ->  GameScreen.WIN
+                            }
+                            buildLayout()
+                        }, onEmitMessage = {
+                            message = it
+                            buildLayout()
+                        })
+                        (controller as OnlineController).startPolling()
+                        currentScreen = GameScreen.ONLINE_LOBBY
+                        buildLayout()
+                    }
                 }
+
             }
         })
 
@@ -227,21 +240,34 @@ class Main : ApplicationAdapter() {
         textButton.name = "joinGameButton"
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
-                val result = proxy.joinGame(name, gameId)
-                if (!result.success){
-                    message = result.errorMessage!!
-                    buildLayout()
-                } else {
-                    myName = name
-                    controller = OnlineController(result.gameState!!.id, onStateUpdated = {
-                        currentScreen = when (it){
+                proxy.joinGame(name, gameId) {result ->
+                    if (!result.success){
+                        message = result.errorMessage!!
+                        buildLayout()
+                    } else {
+                        myName = name
+                        (controller as? OnlineController)?.dispose()
+                        controller = OnlineController(result.gameState!!.id, myName, onStateUpdated = {
+                            currentScreen = when (it){
+                                is LobbyGameState -> GameScreen.ONLINE_LOBBY
+                                is RunningGameState -> GameScreen.GAME
+                                is FinishedGameState ->  GameScreen.WIN
+                            }
+                            buildLayout()
+                        }, onEmitMessage = {
+                            message = it
+                            buildLayout()
+                        })
+                        (controller as OnlineController).startPolling()
+                        currentScreen = when (result.gameState) {
                             is LobbyGameState -> GameScreen.ONLINE_LOBBY
                             is RunningGameState -> GameScreen.GAME
                             is FinishedGameState ->  GameScreen.WIN
                         }
                         buildLayout()
-                    })
+                    }
                 }
+
             }
         })
 
@@ -311,13 +337,47 @@ class Main : ApplicationAdapter() {
             table.row()
         }
 
+        var textButton = TextButton("Quit Lobby", skin)
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
 
+                proxy.quitGame(myName, lobbyState.id) {result ->
+                    if (!result.success){
+                        message = result.errorMessage!!
+                        buildLayout()
+                    } else {
+                        currentScreen = GameScreen.ONLINE_MENU
+                        buildLayout()
+                    }
+                }
+
+            }
+        })
+        table.add(textButton).center()
+        table.row()
+
+        if (myName == lobbyState.host){
+            textButton = TextButton("Start Game", skin)
+            textButton.isDisabled = lobbyState.players.count() < 2
+            textButton.addListener(object : ChangeListener(){
+                override fun changed(event: ChangeEvent?, actor: Actor?) {
+                    (controller as OnlineController).startGame()
+                    textButton = TextButton("Please wait", skin)
+                    textButton.isDisabled = true
+
+                }
+            })
+            table.add(textButton).center()
+        }
 
         return table
     }
 
 
     fun buildWinScreen(): Table {
+        if (controller is OnlineController){
+            (controller as OnlineController).stopPolling()
+        }
         val table = Table()
         table.defaults().pad(15f)
         table.pad(30f)
@@ -359,6 +419,9 @@ class Main : ApplicationAdapter() {
     override fun dispose() {
         skin.dispose()
         stage.dispose()
+        ServerProxy.retrieveInstance().dispose()
+        (controller as? OnlineController)?.stopPolling()
+        (controller as? OnlineController)?.dispose()
     }
 
     fun buildLocalMenuScreen(): Table {
@@ -427,6 +490,7 @@ class Main : ApplicationAdapter() {
                 buildLayout()
             }
         })
+        table.add(textButton).center()
 
 
         return  table
