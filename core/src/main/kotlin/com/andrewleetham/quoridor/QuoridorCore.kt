@@ -31,7 +31,7 @@ class QuoridorCore () {
                 2 -> Color.GREEN
                 else -> Color.YELLOW
             }
-            val player = QuoridorPlayer(start, boardSize, ps.walls, ps.name, color)
+            val player = QuoridorPlayer(start, boardSize, ps.walls, ps.name, PlayerColor.fromGDXColor(color))
             player.position = ps.position
             board.spaces[player.position.first][player.position.second] = i.toString()[0]
             playerList.add(player)
@@ -46,7 +46,7 @@ class QuoridorCore () {
         return RunningGameState(
             gameID,
             players = players.map{
-                PlayerState(it.playerName, it.position, it.walls, PlayerColor.fromGDXColor(it.color))
+                PlayerState(it.playerName, it.position, it.walls, it.color)
             },
             currentPlayerIndex,
             placedWalls = board.wallIntersects.map{
@@ -65,29 +65,29 @@ class QuoridorCore () {
         board = QuoridorBoard(boardSize)
         when (playerCount) {
             2 -> {
-                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, boardSize + 1, "Player 1", Color.BLUE)
+                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, boardSize + 1, "Player 1", PlayerColor.BLUE)
                 board.spaces[player1.position.first][player1.position.second] = '0'
-                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, boardSize + 1, "Player 2", Color.RED)
+                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, boardSize + 1, "Player 2", PlayerColor.RED)
                 board.spaces[player2.position.first][player2.position.second] = '1'
                 players = arrayOf(player1, player2)
             }
             3 -> {
-                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", Color.BLUE)
+                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", PlayerColor.BLUE)
                 board.spaces[player1.position.first][player1.position.second] = '0'
-                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", Color.RED)
+                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", PlayerColor.RED)
                 board.spaces[player2.position.first][player2.position.second] = '1'
-                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", Color.GREEN)
+                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", PlayerColor.GREEN)
                 board.spaces[player3.position.first][player3.position.second] = '2'
                 players = arrayOf(player1, player2, player3)
             }
             4 -> {
-                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", Color.BLUE)
+                val player1 = QuoridorPlayer(Pair(boardSize / 2, 0), boardSize, (boardSize / 2) + 1, "Player 1", PlayerColor.BLUE)
                 board.spaces[player1.position.first][player1.position.second] = '0'
-                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", Color.RED)
+                val player2 = QuoridorPlayer(Pair(boardSize / 2, boardSize - 1), boardSize, (boardSize / 2) + 1, "Player 2", PlayerColor.RED)
                 board.spaces[player2.position.first][player2.position.second] = '1'
-                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", Color.GREEN)
+                val player3 = QuoridorPlayer(Pair(0, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 3", PlayerColor.GREEN)
                 board.spaces[player3.position.first][player3.position.second] = '2'
-                val player4 = QuoridorPlayer(Pair(boardSize - 1, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 4", Color.YELLOW)
+                val player4 = QuoridorPlayer(Pair(boardSize - 1, boardSize / 2), boardSize, (boardSize / 2) +1, "Player 4", PlayerColor.YELLOW)
                 board.spaces[player4.position.first][player4.position.second] = '3'
                 players = arrayOf(player1, player2, player3, player4)
             }
@@ -106,11 +106,10 @@ class QuoridorCore () {
 
     fun hasPath(player: QuoridorPlayer): Boolean{
         val start = player.position
-        val destinations: Set<Pair<Int, Int>>
-        if (player.winOnColumn){
-            destinations = (0 until board.boardSize).map { it to player.winCoord }.toSet()
+        val destinations: Set<Pair<Int, Int>> = if (player.winOnColumn){
+            (0 until board.boardSize).map { it to player.winCoord }.toSet()
         } else {
-            destinations = (0 until board.boardSize).map { player.winCoord to it}.toSet()
+            (0 until board.boardSize).map { player.winCoord to it}.toSet()
         }
         return findPath(start, mutableSetOf(), destinations)
     }
@@ -300,14 +299,14 @@ class QuoridorCore () {
         if (col !in 0..board.boardSize - 2 || row !in 0..board.boardSize - 2) return false
         var collision = board.wallIntersects[row][col] != QuoridorBoard.IntersectType.EMPTY
         val wallType = if(horizontal) QuoridorBoard.IntersectType.HORIZONTAL else QuoridorBoard.IntersectType.VERTICAL
-        if (horizontal) {
-            collision = collision ||
-                (col != 0 && board.wallIntersects[row][col - 1] == wallType) ||
-                (col != board.boardSize - 2 && board.wallIntersects[row][col + 1] == wallType)
+        collision = if (horizontal) {
+            collision ||
+                    (col != 0 && board.wallIntersects[row][col - 1] == wallType) ||
+                    (col != board.boardSize - 2 && board.wallIntersects[row][col + 1] == wallType)
         } else {
-            collision = collision ||
-                (row != 0 && board.wallIntersects[row - 1][col] == wallType) ||
-                (row != board.boardSize - 2 && board.wallIntersects[row + 1][col] == wallType)
+            collision ||
+                    (row != 0 && board.wallIntersects[row - 1][col] == wallType) ||
+                    (row != board.boardSize - 2 && board.wallIntersects[row + 1][col] == wallType)
         }
 
         if (!collision) {

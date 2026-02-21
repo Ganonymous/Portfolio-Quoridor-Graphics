@@ -2,6 +2,8 @@ package com.andrewleetham.quoridor.controller
 
 import com.andrewleetham.quoridor.QuoridorCore
 import com.andrewleetham.quoridor.QuoridorPlayer
+import com.andrewleetham.quoridorserver.model.FinishedGameState
+import com.andrewleetham.quoridorserver.model.GameState
 import com.andrewleetham.quoridorserver.model.RunningGameState
 
 class LocalController(
@@ -24,13 +26,14 @@ class LocalController(
             }
     }
 
-    override fun getGameState(): RunningGameState {
-        return core.toRunningGameState(gameId)
+    override fun getGameState(): GameState {
+        return if(gameWon) FinishedGameState(gameId, core.getCurrentPlayer().playerName)
+            else core.toRunningGameState(gameId)
     }
 
-    override fun getWinningPlayer(): QuoridorPlayer? {
+    override fun getWinner(): String? {
         if (!gameWon){ return null}
-        return core.getCurrentPlayer()
+        return core.getCurrentPlayer().playerName
     }
 
     fun prepareGame(players: Int): Boolean{

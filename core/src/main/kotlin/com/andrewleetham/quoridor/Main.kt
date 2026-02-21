@@ -1,12 +1,18 @@
 package com.andrewleetham.quoridor
 
 import com.andrewleetham.quoridor.controller.LocalController
+import com.andrewleetham.quoridor.controller.OnlineController
 import com.andrewleetham.quoridor.controller.QuoridorController
+import com.andrewleetham.quoridorserver.model.FinishedGameState
+import com.andrewleetham.quoridorserver.model.LobbyGameState
 import com.andrewleetham.quoridorserver.model.RunningGameState
 import com.badlogic.gdx.ApplicationAdapter
 import com.badlogic.gdx.Gdx
 import com.badlogic.gdx.graphics.Color
 import com.badlogic.gdx.graphics.GL20
+import com.badlogic.gdx.graphics.Pixmap
+import com.badlogic.gdx.graphics.Texture
+import com.badlogic.gdx.graphics.g2d.TextureRegion
 import com.badlogic.gdx.math.Vector2
 import com.badlogic.gdx.scenes.scene2d.Actor
 import com.badlogic.gdx.scenes.scene2d.InputEvent
@@ -18,8 +24,10 @@ import com.badlogic.gdx.scenes.scene2d.ui.Skin
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton
 import com.badlogic.gdx.scenes.scene2d.ui.Table
 import com.badlogic.gdx.scenes.scene2d.ui.Label
+import com.badlogic.gdx.scenes.scene2d.ui.TextField
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
+import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
 import com.badlogic.gdx.utils.Scaling
 import com.badlogic.gdx.utils.viewport.ScreenViewport
 
@@ -34,10 +42,13 @@ class Main : ApplicationAdapter() {
     private var readyToPlay = false
     private lateinit var root: Table
     private lateinit var currentAction: TurnAction
+    private lateinit var proxy: ServerProxy
+    private var message = ""
+    private var myName = ""
 
     override fun create() {
         skin = Skin(Gdx.files.internal("metalui/metal-ui.json"))
-
+        proxy = ServerProxy.Instance()
         stage = Stage(ScreenViewport())
         Gdx.input.inputProcessor = stage
 
@@ -54,16 +65,47 @@ class Main : ApplicationAdapter() {
 
     fun buildLayout() {
         root.clear()
-        when (currentScreen) {
-            GameScreen.MAIN_MENU -> root.add(buildMainMenuScreen()).grow()
-            GameScreen.ONLINE_MENU -> root.add(buildOnlineMenuScreen()).grow()
-            GameScreen.ONLINE_LOBBY -> root.add(buildOnlineLobbyScreen()).grow()
-            GameScreen.LOCAL_MENU -> root.add(buildLocalMenuScreen()).grow()
-            GameScreen.RULES -> root.add(buildRulesScreen()).grow()
-            GameScreen.HELP -> root.add(buildHelpScreen()).grow()
-            GameScreen.GAME -> root.add(buildGameScreen()).grow()
-            GameScreen.WIN -> root.add(buildWinScreen()).grow()
+        if (message.isEmpty()){
+            when (currentScreen) {
+                GameScreen.MAIN_MENU -> root.add(buildMainMenuScreen()).grow()
+                GameScreen.ONLINE_MENU -> root.add(buildOnlineMenuScreen()).grow()
+                GameScreen.ONLINE_LOBBY -> root.add(buildOnlineLobbyScreen()).grow()
+                GameScreen.LOCAL_MENU -> root.add(buildLocalMenuScreen()).grow()
+                GameScreen.RULES -> root.add(buildRulesScreen()).grow()
+                GameScreen.HELP -> root.add(buildHelpScreen()).grow()
+                GameScreen.GAME -> root.add(buildGameScreen()).grow()
+                GameScreen.WIN -> root.add(buildWinScreen()).grow()
+            }
+        } else {
+            root.add(buildMessageLayer()).grow()
         }
+    }
+
+    fun buildMessageLayer(): Table {
+        val table = Table()
+        table.defaults().pad(15f)
+        table.pad(30f)
+
+        var label = Label("MESSAGE:", skin)
+        label.setFontScale(1.5f)
+        table.add(label).center()
+        table.row()
+
+        label = Label(message, skin)
+        table.add(label).center()
+        table.row()
+
+        val textButton = TextButton("Close message", skin)
+        textButton.addListener(object : ChangeListener() {
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                message = ""
+                buildLayout()
+            }
+        })
+
+        table.add(textButton).center()
+
+        return table
     }
 
     fun buildMainMenuScreen(): Table {
@@ -118,13 +160,158 @@ class Main : ApplicationAdapter() {
     }
 
     fun buildOnlineMenuScreen(): Table {
+        var name = ""
+        var gameId = ""
         val table = Table()
+        table.defaults().pad(15f)
+        table.pad(30f)
+
+        //title
+        var label = Label("Start or Join Online Game", skin)
+        label.setFontScale(1.5f)
+        table.add(label).center()
+        table.row()
+
+        label = Label("Your name:", skin)
+        table.add(label).center()
+        table.row()
+
+        var textField = TextField("", skin)
+
+        var textButton = TextButton("Create Online Game", skin)
+        textButton.isDisabled = true
+        textButton.name = "createGameButton"
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                val result = proxy.createGame(name)
+                if (!result.success){
+                    message = "Failed to set up online game. Try again"
+                    buildLayout()
+                } else {
+                    myName = name
+                    controller = OnlineController(result.gameState!!.id, onStateUpdated = {
+                        currentScreen = when (it){
+                            is LobbyGameState -> GameScreen.ONLINE_LOBBY
+                            is RunningGameState -> GameScreen.GAME
+                            is FinishedGameState ->  GameScreen.WIN
+                        }
+                        buildLayout()
+                    })
+                }
+            }
+        })
+
+        textField.setTextFieldListener(TextField.TextFieldListener(
+            fun (field: TextField, c: Char) {
+                name = field.text
+                table.findActor<TextButton>("createGameButton").isDisabled = name.isEmpty()
+                table.findActor<TextButton>("joinGameButton").isDisabled = gameId.isEmpty() || name.isEmpty()
+
+            }))
+
+
+        table.add(textField).center()
+        table.row()
+        table.add(textButton).center()
+        table.row()
+
+        label = Label("Game Code:", skin)
+        table.add(label).center()
+        table.row()
+
+        textField = TextField("", skin)
+
+
+        textButton = TextButton("Join Online Game", skin)
+        textButton.isDisabled = true
+        textButton.name = "joinGameButton"
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                val result = proxy.joinGame(name, gameId)
+                if (!result.success){
+                    message = result.errorMessage!!
+                    buildLayout()
+                } else {
+                    myName = name
+                    controller = OnlineController(result.gameState!!.id, onStateUpdated = {
+                        currentScreen = when (it){
+                            is LobbyGameState -> GameScreen.ONLINE_LOBBY
+                            is RunningGameState -> GameScreen.GAME
+                            is FinishedGameState ->  GameScreen.WIN
+                        }
+                        buildLayout()
+                    })
+                }
+            }
+        })
+
+        textField.setTextFieldListener(TextField.TextFieldListener(
+            fun (field: TextField, c: Char) {
+                gameId = field.text
+                table.findActor<TextButton>("joinGameButton").isDisabled = gameId.isEmpty() || name.isEmpty()
+            }))
+
+        table.add(textField).center()
+        table.row()
+
+        table.add(textButton).center()
+        table.row()
+
+        textButton = TextButton("Return to Main Menu", skin)
+        textButton.addListener(object : ChangeListener(){
+            override fun changed(event: ChangeEvent?, actor: Actor?) {
+                currentScreen = GameScreen.MAIN_MENU
+                buildLayout()
+            }
+        })
+
+        table.add(textButton).center()
+        table.row()
+
 
         return table
     }
 
     fun buildOnlineLobbyScreen(): Table {
+        val lobbyState = (controller as OnlineController).getGameState() as LobbyGameState
         val table = Table()
+        table.defaults().pad(15f)
+        table.pad(30f)
+
+        //title
+        var label = Label("Online Game Lobby", skin)
+        label.setFontScale(1.5f)
+        table.add(label).center()
+        table.row()
+
+        label = Label("Game ID: ${lobbyState.id}", skin)
+        table.add(label).center()
+        table.row()
+
+        for ((i, player) in lobbyState.players.withIndex()){
+            val displayColor = when(i){
+                0 -> Color.BLUE
+                1 -> Color.RED
+                2 -> Color.GREEN
+                else -> Color.YELLOW
+            }
+
+            val playerTable = Table()
+            val backgroundMap = Pixmap(1, 1, Pixmap.Format.RGB888)
+            backgroundMap.setColor(displayColor)
+            backgroundMap.fill()
+            val background = TextureRegionDrawable(TextureRegion(Texture(backgroundMap)))
+            backgroundMap.dispose()
+            playerTable.background = background
+            playerTable.pad(10f)
+
+            label = if (myName == player)Label("$player <- You", skin) else Label(player, skin)
+            playerTable.add(label).center()
+            table.add(playerTable).center()
+            table.row()
+        }
+
+
 
         return table
     }
@@ -141,7 +328,7 @@ class Main : ApplicationAdapter() {
         table.add(label).center()
         table.row()
 
-        label = Label("${controller.getWinningPlayer()!!.playerName} wins!", skin)
+        label = Label("${controller.getWinner()} wins!", skin)
         table.add(label).center()
         table.row()
 
@@ -313,7 +500,7 @@ class Main : ApplicationAdapter() {
     }
 
     fun buildGameScreen(): Table {
-        val state = controller.getGameState()
+        val state = controller.getGameState() as RunningGameState
         val table = Table()
 
         //Display the players
@@ -414,7 +601,7 @@ class Main : ApplicationAdapter() {
             return
         }
         val core = QuoridorCore()
-        core.fromRunningGameState(controller.getGameState())
+        core.fromRunningGameState(controller.getGameState() as RunningGameState)
         val legal = core.isLegalWallPlacement(Pair(row, col), horizontal)
 
         wallGhost.isVisible = true
@@ -440,13 +627,13 @@ class Main : ApplicationAdapter() {
     fun buildPlayersTable(state: RunningGameState): Table{
         val table = Table()
 
-        table.add(QuoridorPlayer.fromPlayerState(state.players[0]).buildPlayerDisplay(skin)).growX()
-        table.add(QuoridorPlayer.fromPlayerState(state.players[1]).buildPlayerDisplay(skin)).growX()
+        table.add(buildPlayerDisplay(QuoridorPlayer.fromPlayerState(state.players[0]))).growX()
+        table.add(buildPlayerDisplay(QuoridorPlayer.fromPlayerState(state.players[1]))).growX()
         if(state.players.count() > 2){
             table.row()
-            table.add(QuoridorPlayer.fromPlayerState(state.players[2]).buildPlayerDisplay(skin)).growX()
+            table.add(buildPlayerDisplay(QuoridorPlayer.fromPlayerState(state.players[2]))).growX()
             if (state.players.count() == 4){
-                table.add(QuoridorPlayer.fromPlayerState(state.players[3]).buildPlayerDisplay(skin)).growX()
+                table.add(buildPlayerDisplay(QuoridorPlayer.fromPlayerState(state.players[3]))).growX()
             }
         }
 
@@ -483,7 +670,7 @@ class Main : ApplicationAdapter() {
                 if (pieceIndex != null) {
                     val piece = Image(skin.getDrawable("radio-on"))
                     piece.setScaling(Scaling.fit)
-                    piece.setColor(core.getPlayer(pieceIndex).color)
+                    piece.setColor(core.getPlayer(pieceIndex).color.toGdxColor())
 
                     // size relative to cell
                     val pawnSize = cellSize
@@ -576,6 +763,32 @@ class Main : ApplicationAdapter() {
         return table
     }
 
+    fun buildPlayerDisplay(player: QuoridorPlayer): Table {
+        val table = Table()
+        table.defaults().pad(4f)
+        val backgroundMap = Pixmap(1, 1, Pixmap.Format.RGB888)
+        backgroundMap.setColor(player.color.toGdxColor())
+        backgroundMap.fill()
+        val background = TextureRegionDrawable(TextureRegion(Texture(backgroundMap)))
+        backgroundMap.dispose()
+        table.background = background
+        table.pad(10f)
+
+        var label = Label(player.playerName, skin)
+        table.add(label).colspan(11).center()
+        table.row()
+
+        label = Label("Walls:", skin)
+        table.add(label).growX()
+
+        for (i in 1..10){
+            val text = if(player.walls >= i) "[#]" else "[ ]"
+            label = Label(text, skin)
+            table.add(label).width(20f).center().growX()
+        }
+
+        return table
+    }
 
 }
 
