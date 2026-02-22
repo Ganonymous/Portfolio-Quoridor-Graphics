@@ -4,6 +4,7 @@ import com.andrewleetham.quoridor.controller.LocalController
 import com.andrewleetham.quoridor.controller.OnlineController
 import com.andrewleetham.quoridor.controller.QuoridorController
 import com.andrewleetham.quoridorserver.model.FinishedGameState
+import com.andrewleetham.quoridorserver.model.LoadingGameState
 import com.andrewleetham.quoridorserver.model.LobbyGameState
 import com.andrewleetham.quoridorserver.model.RunningGameState
 import com.badlogic.gdx.ApplicationAdapter
@@ -27,6 +28,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label
 import com.badlogic.gdx.scenes.scene2d.ui.TextField
 import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener
+import com.badlogic.gdx.scenes.scene2d.utils.Drawable
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable
 import com.badlogic.gdx.utils.Scaling
 import com.badlogic.gdx.utils.viewport.ScreenViewport
@@ -52,6 +54,10 @@ class Main : ApplicationAdapter() {
         stage = Stage(ScreenViewport())
         Gdx.input.inputProcessor = stage
 
+        skin.add("playerBlue", makeColorDrawable(Color.BLUE), Drawable::class.java)
+        skin.add("playerRed", makeColorDrawable(Color.RED), Drawable::class.java)
+        skin.add("playerGreen", makeColorDrawable(Color.GREEN), Drawable::class.java)
+        skin.add("playerYellow", makeColorDrawable(Color.YELLOW), Drawable::class.java)
 
 
         currentScreen = GameScreen.MAIN_MENU
@@ -61,6 +67,10 @@ class Main : ApplicationAdapter() {
         buildLayout()
 
 
+    }
+
+    fun UiCall(block: () -> Unit){
+        Gdx.app.postRunnable(block)
     }
 
     fun buildLayout() {
@@ -109,8 +119,10 @@ class Main : ApplicationAdapter() {
     }
 
     fun buildMainMenuScreen(): Table {
-        if (controller is OnlineController){
-            (controller as OnlineController).stopPolling()
+        if (::controller.isInitialized) {
+            if (controller is OnlineController){
+                (controller as OnlineController).stopPolling()
+            }
         }
         val table = Table()
         table.defaults().pad(15f)
@@ -149,7 +161,7 @@ class Main : ApplicationAdapter() {
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
                 currentScreen = GameScreen.LOCAL_MENU
-                (controller as? OnlineController)?.dispose()
+                if (::controller.isInitialized) (controller as? OnlineController)?.dispose()
                 controller = LocalController(QuoridorCore(), "Local", onStateUpdated = {
                     currentScreen = if((controller as LocalController).gameWon) GameScreen.WIN else GameScreen.GAME
                     buildLayout()
@@ -188,26 +200,35 @@ class Main : ApplicationAdapter() {
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
                 proxy.createGame(name) {result ->
-                    if (!result.success){
-                        message = "Failed to set up online game. Try again"
-                        buildLayout()
-                    } else {
-                        myName = name
-                        (controller as? OnlineController)?.dispose()
-                        controller = OnlineController(result.gameState!!.id, myName, onStateUpdated = {
-                            currentScreen = when (it){
-                                is LobbyGameState -> GameScreen.ONLINE_LOBBY
-                                is RunningGameState -> GameScreen.GAME
-                                is FinishedGameState ->  GameScreen.WIN
-                            }
+                    UiCall {
+                        if (!result.success) {
+                            message = "Failed to set up online game. Try again"
                             buildLayout()
-                        }, onEmitMessage = {
-                            message = it
+                        } else {
+                            myName = name
+
+                            if (::controller.isInitialized) (controller as? OnlineController)?.dispose()
+
+                            controller = OnlineController(result.gameState!!.id, myName, onStateUpdated = {
+                                UiCall{
+                                    currentScreen = when (it) {
+                                        is LoadingGameState -> GameScreen.ONLINE_LOBBY
+                                        is LobbyGameState -> GameScreen.ONLINE_LOBBY
+                                        is RunningGameState -> GameScreen.GAME
+                                        is FinishedGameState -> GameScreen.WIN
+                                    }
+                                    buildLayout()
+                                }
+                            }, onEmitMessage = {
+                                UiCall {
+                                    message = it
+                                    buildLayout()
+                                }
+                            })
+                            (controller as OnlineController).startPolling()
+                            currentScreen = GameScreen.ONLINE_LOBBY
                             buildLayout()
-                        })
-                        (controller as OnlineController).startPolling()
-                        currentScreen = GameScreen.ONLINE_LOBBY
-                        buildLayout()
+                        }
                     }
                 }
 
@@ -241,30 +262,38 @@ class Main : ApplicationAdapter() {
         textButton.addListener(object : ChangeListener(){
             override fun changed(event: ChangeEvent?, actor: Actor?) {
                 proxy.joinGame(name, gameId) {result ->
-                    if (!result.success){
-                        message = result.errorMessage!!
-                        buildLayout()
-                    } else {
-                        myName = name
-                        (controller as? OnlineController)?.dispose()
-                        controller = OnlineController(result.gameState!!.id, myName, onStateUpdated = {
-                            currentScreen = when (it){
+                    UiCall{
+                        if (!result.success) {
+                            message = result.errorMessage!!
+                            buildLayout()
+                        } else {
+                            myName = name
+                            if (::controller.isInitialized) (controller as? OnlineController)?.dispose()
+                            controller = OnlineController(result.gameState!!.id, myName, onStateUpdated = {
+                                UiCall{
+                                    currentScreen = when (it) {
+                                        is LoadingGameState -> GameScreen.ONLINE_LOBBY
+                                        is LobbyGameState -> GameScreen.ONLINE_LOBBY
+                                        is RunningGameState -> GameScreen.GAME
+                                        is FinishedGameState -> GameScreen.WIN
+                                    }
+                                    buildLayout()
+                                }
+                            }, onEmitMessage = {
+                                UiCall {
+                                    message = it
+                                    buildLayout()
+                                }
+                            })
+                            (controller as OnlineController).startPolling()
+                            currentScreen = when (result.gameState) {
+                                is LoadingGameState -> GameScreen.ONLINE_LOBBY
                                 is LobbyGameState -> GameScreen.ONLINE_LOBBY
                                 is RunningGameState -> GameScreen.GAME
-                                is FinishedGameState ->  GameScreen.WIN
+                                is FinishedGameState -> GameScreen.WIN
                             }
                             buildLayout()
-                        }, onEmitMessage = {
-                            message = it
-                            buildLayout()
-                        })
-                        (controller as OnlineController).startPolling()
-                        currentScreen = when (result.gameState) {
-                            is LobbyGameState -> GameScreen.ONLINE_LOBBY
-                            is RunningGameState -> GameScreen.GAME
-                            is FinishedGameState ->  GameScreen.WIN
                         }
-                        buildLayout()
                     }
                 }
 
@@ -298,7 +327,31 @@ class Main : ApplicationAdapter() {
         return table
     }
 
+    fun buildLoading(): Table {
+        val table = Table()
+        table.defaults().pad(15f)
+        table.pad(30f)
+
+        //title
+        val label = Label("Loading Game, please wait.", skin)
+        label.setFontScale(1.5f)
+        table.add(label).center()
+
+        return table
+    }
+
+    fun makeColorDrawable(color: Color): Drawable {
+        val pixmap = Pixmap(1, 1, Pixmap.Format.RGBA8888)
+        pixmap.setColor(color)
+        pixmap.fill()
+        val texture = Texture(pixmap)
+        pixmap.dispose()
+        return TextureRegionDrawable(TextureRegion(texture))
+    }
+
+
     fun buildOnlineLobbyScreen(): Table {
+        if ((controller as OnlineController).getGameState() is LoadingGameState) return buildLoading()
         val lobbyState = (controller as OnlineController).getGameState() as LobbyGameState
         val table = Table()
         table.defaults().pad(15f)
@@ -315,20 +368,14 @@ class Main : ApplicationAdapter() {
         table.row()
 
         for ((i, player) in lobbyState.players.withIndex()){
-            val displayColor = when(i){
-                0 -> Color.BLUE
-                1 -> Color.RED
-                2 -> Color.GREEN
-                else -> Color.YELLOW
-            }
 
             val playerTable = Table()
-            val backgroundMap = Pixmap(1, 1, Pixmap.Format.RGB888)
-            backgroundMap.setColor(displayColor)
-            backgroundMap.fill()
-            val background = TextureRegionDrawable(TextureRegion(Texture(backgroundMap)))
-            backgroundMap.dispose()
-            playerTable.background = background
+            playerTable.background = when (i){
+                0 -> skin.getDrawable("playerBlue")
+                1 -> skin.getDrawable("playerRed")
+                2 -> skin.getDrawable("playerGreen")
+                else -> skin.getDrawable("playerYellow")
+            }
             playerTable.pad(10f)
 
             label = if (myName == player)Label("$player <- You", skin) else Label(player, skin)
@@ -342,12 +389,14 @@ class Main : ApplicationAdapter() {
             override fun changed(event: ChangeEvent?, actor: Actor?) {
 
                 proxy.quitGame(myName, lobbyState.id) {result ->
-                    if (!result.success){
-                        message = result.errorMessage!!
-                        buildLayout()
-                    } else {
-                        currentScreen = GameScreen.ONLINE_MENU
-                        buildLayout()
+                    UiCall{
+                        if (!result.success) {
+                            message = result.errorMessage!!
+                            buildLayout()
+                        } else {
+                            currentScreen = GameScreen.MAIN_MENU
+                            buildLayout()
+                        }
                     }
                 }
 
@@ -420,8 +469,12 @@ class Main : ApplicationAdapter() {
         skin.dispose()
         stage.dispose()
         ServerProxy.retrieveInstance().dispose()
-        (controller as? OnlineController)?.stopPolling()
-        (controller as? OnlineController)?.dispose()
+        if (::controller.isInitialized) {
+            if (controller is OnlineController){
+                (controller as OnlineController).stopPolling()
+                (controller as OnlineController).dispose()
+            }
+        }
     }
 
     fun buildLocalMenuScreen(): Table {
@@ -564,6 +617,8 @@ class Main : ApplicationAdapter() {
     }
 
     fun buildGameScreen(): Table {
+        if (!::currentAction.isInitialized) currentAction = TurnAction.MOVE
+        if (controller.getGameState() is LoadingGameState) return buildLoading()
         val state = controller.getGameState() as RunningGameState
         val table = Table()
 
@@ -614,77 +669,81 @@ class Main : ApplicationAdapter() {
 
         table.row()
 
-        textButton = TextButton("Help", skin)
-        textButton.addListener(object : ChangeListener(){
-            override fun changed(event: ChangeEvent?, actor: Actor?) {
-                currentScreen = GameScreen.HELP
-                buildLayout()
-            }
-        })
-        table.add(textButton).center().colspan(2)
+        if (controller is LocalController){
+            textButton = TextButton("Help", skin)
+            textButton.addListener(object : ChangeListener(){
+                override fun changed(event: ChangeEvent?, actor: Actor?) {
+                    currentScreen = GameScreen.HELP
+                    buildLayout()
+                }
+            })
+            table.add(textButton).center().colspan(2)
+        }
 
         return  table
     }
 
     fun updateWallGhost() {
         val boardTable = root.findActor<Table>("boardTable")
-        val wallGhost = boardTable.findActor<Image>("wallGhost")
-        if (currentAction == TurnAction.MOVE) {
-            wallGhost.isVisible = false
-            return
-        }
+        if (boardTable != null) {
+            val wallGhost = boardTable.findActor<Image>("wallGhost")
+            if (currentAction == TurnAction.MOVE) {
+                wallGhost.isVisible = false
+                return
+            }
 
-        val mouse = Vector2(Gdx.input.x.toFloat(), Gdx.input.y.toFloat())
-        stage.screenToStageCoordinates(mouse)
+            val mouse = Vector2(Gdx.input.x.toFloat(), Gdx.input.y.toFloat())
+            stage.screenToStageCoordinates(mouse)
 
-        val cellSize = 48f
-        val gap = 12f
+            val cellSize = 48f
+            val gap = 12f
 
-        val local = Vector2(mouse)
-        boardTable.stageToLocalCoordinates(local)
+            val local = Vector2(mouse)
+            boardTable.stageToLocalCoordinates(local)
 
-        // Remove table padding
-        local.x -= boardTable.padLeft
-        local.y -= boardTable.padBottom
+            // Remove table padding
+            local.x -= boardTable.padLeft
+            local.y -= boardTable.padBottom
 
-        val stride = cellSize + gap
+            val stride = cellSize + gap
 
-        var col = (local.x / stride).toInt()
-        var row = 8 - (local.y / stride).toInt()
+            var col = (local.x / stride).toInt()
+            var row = 8 - (local.y / stride).toInt()
 
-        // Furthest column and row can map to walls sensibly
-        if (col == 8) col = 7
-        if (row == 8) row = 7
+            // Furthest column and row can map to walls sensibly
+            if (col == 8) col = 7
+            if (row == 8) row = 7
 
-        // determine wall orientation
-        val horizontal = currentAction == TurnAction.WALL_HORIZONTAL
-
-
-        if (col !in 0..7 || row !in 0..7) {
-            wallGhost.isVisible = false
-            return
-        }
-        val core = QuoridorCore()
-        core.fromRunningGameState(controller.getGameState() as RunningGameState)
-        val legal = core.isLegalWallPlacement(Pair(row, col), horizontal)
-
-        wallGhost.isVisible = true
-        wallGhost.color = if (legal) Color(0f, 0f, 1f, 0.4f) else Color(1f,0f,0f,0.5f)
+            // determine wall orientation
+            val horizontal = currentAction == TurnAction.WALL_HORIZONTAL
 
 
-        val cell = root.findActor<Table>("Cell-$row-$col")
-        val stagePos = cell.localToStageCoordinates(Vector2(0f,0f))
-        val boardLocal = boardTable.stageToLocalCoordinates(stagePos)
-        if (horizontal) {
-            wallGhost.setSize(cellSize * 2 + gap, gap)
-            wallGhost.setPosition(boardLocal.x, boardLocal.y - gap)
-        } else {
-            wallGhost.setSize(gap, cellSize * 2 + gap)
-            wallGhost.setPosition(boardLocal.x + cellSize, boardLocal.y - stride)
-        }
+            if (col !in 0..7 || row !in 0..7) {
+                wallGhost.isVisible = false
+                return
+            }
+            val core = QuoridorCore()
+            core.fromRunningGameState(controller.getGameState() as RunningGameState)
+            val legal = core.isLegalWallPlacement(Pair(row, col), horizontal)
 
-        if (legal && Gdx.input.justTouched()) {
-            controller.requestWall(Pair(row, col), horizontal)
+            wallGhost.isVisible = true
+            wallGhost.color = if (legal) Color(0f, 0f, 1f, 0.4f) else Color(1f,0f,0f,0.5f)
+
+
+            val cell = root.findActor<Table>("Cell-$row-$col")
+            val stagePos = cell.localToStageCoordinates(Vector2(0f,0f))
+            val boardLocal = boardTable.stageToLocalCoordinates(stagePos)
+            if (horizontal) {
+                wallGhost.setSize(cellSize * 2 + gap, gap)
+                wallGhost.setPosition(boardLocal.x, boardLocal.y - gap)
+            } else {
+                wallGhost.setSize(gap, cellSize * 2 + gap)
+                wallGhost.setPosition(boardLocal.x + cellSize, boardLocal.y - stride)
+            }
+
+            if (legal && Gdx.input.justTouched()) {
+                controller.requestWall(Pair(row, col), horizontal)
+            }
         }
     }
 

@@ -7,5 +7,4 @@ class FinishedGameState (
     override val id: String,
     val winner: String
 ) : GameState() {
-    override var phase: GamePhase = GamePhase.FINISHED
 }

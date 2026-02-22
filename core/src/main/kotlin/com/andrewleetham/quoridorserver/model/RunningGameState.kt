@@ -15,5 +15,4 @@ data class RunningGameState(
     val placedWalls: List<List<IntersectType>>
 
 ) : GameState(){
-    override var phase: GamePhase = GamePhase.RUNNING
 }

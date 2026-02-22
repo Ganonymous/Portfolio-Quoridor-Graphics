@@ -3,6 +3,7 @@ package com.andrewleetham.quoridor.controller
 import com.andrewleetham.quoridor.ServerProxy
 import com.andrewleetham.quoridorserver.model.FinishedGameState
 import com.andrewleetham.quoridorserver.model.GameState
+import com.andrewleetham.quoridorserver.model.LoadingGameState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -46,6 +47,7 @@ class OnlineController(
     override fun requestMove(target: Pair<Int, Int>) {
         proxy.sendMove(playerName, gameId, target) {response ->
             if(response.success){
+                lastGameState = response.gameState
                 onStateUpdated(response.gameState!!)
             }
             else {
@@ -57,6 +59,7 @@ class OnlineController(
     override fun requestWall(target: Pair<Int, Int>, horizontal: Boolean) {
         proxy.sendWall(playerName, gameId, target, horizontal) {response ->
             if(response.success){
+                lastGameState = response.gameState
                 onStateUpdated(response.gameState!!)
             }
             else {
@@ -66,7 +69,7 @@ class OnlineController(
     }
 
     override fun getGameState(): GameState {
-        return lastGameState!!
+        return lastGameState?: LoadingGameState()
 
     }
 
@@ -79,6 +82,7 @@ class OnlineController(
     fun startGame(){
         proxy.startGame(playerName, gameId) { response ->
             if(response.success){
+                lastGameState = response.gameState
                 onStateUpdated(response.gameState!!)
             }
             else {
@@ -91,6 +95,9 @@ class OnlineController(
         proxy.getGameState(playerName, gameId) { response ->
             if(response.success){
                 if (lastGameState != response.gameState){ lastGameState = response.gameState }
+                onStateUpdated(response.gameState!!)
+            } else {
+                onEmitMessage(response.errorMessage ?: "Server connection error")
             }
         }
     }
