@@ -22,7 +22,7 @@ import kotlinx.serialization.json.Json
 
 class ServerProxy {
 
-    private val baseUrl = "http://127.0.0.1:8080"
+    private val baseUrl = "https://portfolio-quoridor-server.onrender.com"
 
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
